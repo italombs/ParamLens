@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // UI smoke test in a real Chromium (Playwright).
-//   node tools/ui-smoke.js build/ParamLens.html build/parity/export.tsv [linux-binary]
+//   node scripts/ui-smoke.js dist/ParamLens.html dist/parity/export.tsv [linux-binary]
 // 1) ParamLens.html over file:// (file mode), language switch, 2) exported report,
-// 3) the server (.exe) with demo data and the switch to file mode. Screenshots in build/shots/.
+// 3) the server (.exe) with demo data and the switch to file mode. Screenshots in dist/shots/.
 "use strict";
 const path = require("path");
 const fs = require("fs");
@@ -10,7 +10,7 @@ const { spawn } = require("child_process");
 const { chromium } = require("playwright");
 
 const [htmlPath, tsvPath, binPath] = process.argv.slice(2);
-const shots = path.resolve("build/shots");
+const shots = path.resolve("dist/shots");
 fs.mkdirSync(shots, { recursive: true });
 let failures = 0;
 const check = (cond, msg) => { console.log((cond ? "ok     " : "FAILED ") + msg); if (!cond) failures++; };

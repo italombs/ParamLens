@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 // Go × JS parity test: reads the fixtures written by TestParityFixtures
-// (parity_test.go), runs the JS engine on the same export.tsv and compares everything.
+// (internal/engine/parity_test.go), runs the JS engine on the same export.tsv and compares everything.
 //
-//   PARAMLENS_PARITY_DIR=build/parity go test -run TestParityFixtures .
-//   node tools/parity.js build/parity
+//   PARAMLENS_PARITY_DIR=$PWD/dist/parity go test -run TestParityFixtures ./internal/engine
+//   node scripts/parity.js dist/parity
 "use strict";
 const fs = require("fs");
 const path = require("path");
 const PL = require("../web/engine.js");
 
-const dir = process.argv[2] || "build/parity";
+const dir = process.argv[2] || "dist/parity";
 const tsv = fs.readFileSync(path.join(dir, "export.tsv"));
 const variants = JSON.parse(fs.readFileSync(path.join(dir, "variants.json"), "utf8"));
 

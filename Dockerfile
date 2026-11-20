@@ -17,8 +17,8 @@ RUN go mod download
 COPY . .
 ARG VERSION=dev
 RUN go vet ./... && go test ./...
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/paramlens . \
- && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/ParamLens.exe . \
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/paramlens ./cmd/paramlens \
+ && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/ParamLens.exe ./cmd/paramlens \
  && /out/paramlens -write-html /out/ParamLens.html
 
 # ---- export: .exe + HTML version (docker build --target export --output dist .) ----

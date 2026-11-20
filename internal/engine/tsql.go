@@ -1,4 +1,4 @@
-package main
+package engine
 
 // Tokenizer T-SQL leve e tolerante. Não valida sintaxe: só separa tokens
 // respeitando strings (com '' e prefixo N), [identificadores]], "aspas",

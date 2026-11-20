@@ -35,6 +35,7 @@ jobs:
 
       - name: Executable metadata (name, version, copyright)
         shell: bash
+        working-directory: cmd/paramlens
         run: |
           go install github.com/tc-hib/go-winres@v0.3.3
           go-winres simply --arch amd64 --manifest cli \
@@ -53,12 +54,12 @@ jobs:
           CGO_ENABLED: '0'
         run: |
           mkdir -p dist
-          go build -trimpath -ldflags "-s -w -X main.version=${{ steps.ver.outputs.version }}" -o dist/ParamLens.exe .
+          go build -trimpath -ldflags "-s -w -X main.version=${{ steps.ver.outputs.version }}" -o dist/ParamLens.exe ./cmd/paramlens
 
       - name: Standalone HTML version (offline)
         shell: bash
         run: |
-          go run . -write-html dist/ParamLens.html
+          go run ./cmd/paramlens -write-html dist/ParamLens.html
           grep -q 'id="pl-engine"' dist/ParamLens.html
 
       - name: Upload the unsigned executable

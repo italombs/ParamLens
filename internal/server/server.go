@@ -1,13 +1,12 @@
-package main
+// Package server is the local HTTP server of the .exe: it serves the interface, runs the
+// analysis jobs (Go engine over SQL Server sources) and exports the static report.
+package server
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
-	_ "embed"
 	"encoding/hex"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -16,32 +15,24 @@ import (
 	"os/signal"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/italombs/ParamLens/internal/engine"
+	"github.com/italombs/ParamLens/internal/source"
+	"github.com/italombs/ParamLens/web"
 )
 
-//go:embed web/index.html
-var indexSrc []byte
-
-//go:embed web/engine.js
-var engineJS []byte
-
-// indexHTML é a interface com o motor JS embutido (o mesmo arquivo serve o .exe,
-// o relatório exportado e a versão 100% HTML).
-var indexHTML = assembleHTML(indexSrc, engineJS)
-
-// assembleHTML injeta o motor JS no marcador <!--ENGINE--> do index.html.
-func assembleHTML(index, engine []byte) []byte {
-	inj := append([]byte("<script id=\"pl-engine\">\n"), engine...)
-	inj = append(inj, []byte("</script>")...)
-	return bytes.Replace(index, []byte("<!--ENGINE-->"), inj, 1)
+// Options configures Run.
+type Options struct {
+	Version   string
+	Port      int    // 0 = automatic
+	Bind      string // listen address; 127.0.0.1 unless inside a container
+	NoBrowser bool
 }
 
-var version = "1.0.0"
-
 type Job struct {
-	eng    *Engine
+	eng    *engine.Engine
 	state  string // running | done | error | canceled
 	err    string
 	cancel context.CancelFunc
@@ -55,27 +46,16 @@ var (
 	token string
 )
 
-func main() {
-	port := flag.Int("port", 0, "local port (0 = automatic)")
-	noBrowser := flag.Bool("no-browser", false, "do not open the browser")
-	bind := flag.String("bind", "127.0.0.1", "listen address (use 0.0.0.0 only inside a container, publishing the port on 127.0.0.1)")
-	writeHTML := flag.String("write-html", "", "write the standalone (offline) HTML version to this file and exit")
-	flag.Parse()
-
-	if *writeHTML != "" {
-		if err := os.WriteFile(*writeHTML, indexHTML, 0o644); err != nil {
-			fmt.Println("Error:", err)
-			os.Exit(1)
-		}
-		fmt.Println("Written:", *writeHTML)
-		return
+// Run starts the server and blocks until the process ends.
+func Run(o Options) {
+	if o.Bind == "" {
+		o.Bind = "127.0.0.1"
 	}
-
 	b := make([]byte, 16)
 	rand.Read(b)
 	token = hex.EncodeToString(b)
 
-	ln, err := net.Listen("tcp", net.JoinHostPort(*bind, strconv.Itoa(*port)))
+	ln, err := net.Listen("tcp", net.JoinHostPort(o.Bind, strconv.Itoa(o.Port)))
 	if err != nil {
 		fmt.Println("Could not open the local port:", err)
 		waitExit()
@@ -103,14 +83,14 @@ func main() {
 	api("/api/quit", hQuit)
 
 	fmt.Println("==============================================")
-	fmt.Println(" ParamLens " + version + " — parameter profiling for rpc_completed")
+	fmt.Println(" ParamLens " + o.Version + " — parameter profiling for rpc_completed")
 	fmt.Println("==============================================")
 	fmt.Println(" Interface: " + u)
 	fmt.Println(" Only accepts connections from this machine (127.0.0.1).")
 	fmt.Println(" Close this window to quit.")
 	fmt.Println()
 
-	if !*noBrowser {
+	if !o.NoBrowser {
 		go func() {
 			time.Sleep(300 * time.Millisecond)
 			openBrowser(u)
@@ -190,7 +170,7 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(indexHTML)
+	w.Write(web.Page())
 }
 
 func readJSON(r *http.Request, v any) error {
@@ -215,14 +195,14 @@ func reqCtx(r *http.Request, d time.Duration) (context.Context, context.CancelFu
 }
 
 func hTest(w http.ResponseWriter, r *http.Request) {
-	var c ConnReq
+	var c source.ConnReq
 	if err := readJSON(r, &c); err != nil {
 		writeErr(w, err)
 		return
 	}
 	ctx, cancel := reqCtx(r, 30*time.Second)
 	defer cancel()
-	si, err := testConn(ctx, c)
+	si, err := source.TestConn(ctx, c)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -232,8 +212,8 @@ func hTest(w http.ResponseWriter, r *http.Request) {
 
 func hTables(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Conn ConnReq `json:"conn"`
-		DB   string  `json:"db"`
+		Conn source.ConnReq `json:"conn"`
+		DB   string         `json:"db"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, err)
@@ -241,7 +221,7 @@ func hTables(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := reqCtx(r, 60*time.Second)
 	defer cancel()
-	t, err := listTables(ctx, req.Conn, req.DB)
+	t, err := source.ListTables(ctx, req.Conn, req.DB)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -251,10 +231,10 @@ func hTables(w http.ResponseWriter, r *http.Request) {
 
 func hColumns(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Conn   ConnReq `json:"conn"`
-		DB     string  `json:"db"`
-		Schema string  `json:"schema"`
-		Table  string  `json:"table"`
+		Conn   source.ConnReq `json:"conn"`
+		DB     string         `json:"db"`
+		Schema string         `json:"schema"`
+		Table  string         `json:"table"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, err)
@@ -262,7 +242,7 @@ func hColumns(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := reqCtx(r, 30*time.Second)
 	defer cancel()
-	c, err := listColumns(ctx, req.Conn, req.DB, req.Schema, req.Table)
+	c, err := source.ListColumns(ctx, req.Conn, req.DB, req.Schema, req.Table)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -271,10 +251,10 @@ func hColumns(w http.ResponseWriter, r *http.Request) {
 }
 
 type analyzeReq struct {
-	Conn              ConnReq   `json:"conn"`
-	Source            SourceReq `json:"source"`
-	NormalizeLiterals bool      `json:"normalizeLiterals"`
-	UnitMs            bool      `json:"unitMs"`
+	Conn              source.ConnReq   `json:"conn"`
+	Source            source.SourceReq `json:"source"`
+	NormalizeLiterals bool             `json:"normalizeLiterals"`
+	UnitMs            bool             `json:"unitMs"`
 }
 
 func hPreview(w http.ResponseWriter, r *http.Request) {
@@ -283,7 +263,7 @@ func hPreview(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	q, _, err := BuildQuery(req.Source)
+	q, _, err := source.BuildQuery(req.Source)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -299,14 +279,14 @@ func hAnalyze(w http.ResponseWriter, r *http.Request) {
 	}
 	query := ""
 	if req.Source.Type != "demo" {
-		q, _, err := BuildQuery(req.Source)
+		q, _, err := source.BuildQuery(req.Source)
 		if err != nil {
 			writeErr(w, err)
 			return
 		}
 		query = q
 	}
-	eng, err := NewEngine(Options{NormalizeLiterals: req.NormalizeLiterals, UnitMs: req.UnitMs})
+	eng, err := engine.NewEngine(engine.Options{NormalizeLiterals: req.NormalizeLiterals, UnitMs: req.UnitMs})
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -337,9 +317,9 @@ func hAnalyze(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		var err error
 		if req.Source.Type == "demo" {
-			err = runDemo(ctx, req.Source.DemoRows, eng.Ingest)
+			err = source.RunDemo(ctx, req.Source.DemoRows, eng.Ingest)
 		} else {
-			err = runSQLSource(ctx, req.Conn, req.Source, eng.Ingest)
+			err = source.RunSQL(ctx, req.Conn, req.Source, eng.Ingest)
 		}
 		eng.Finish()
 		jobMu.Lock()
@@ -371,7 +351,7 @@ func hStatus(w http.ResponseWriter, r *http.Request) {
 		"read":      e.Read.Load(),
 		"parsed":    e.Parsed.Load(),
 		"failed":    e.Failed.Load(),
-		"elapsedMs": time.Since(e.started).Milliseconds(),
+		"elapsedMs": time.Since(e.Started()).Milliseconds(),
 		"label":     job.label,
 		"query":     job.query,
 	})
@@ -386,7 +366,7 @@ func hCancel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"ok": "1"})
 }
 
-func curEngine() (*Engine, string, string) {
+func curEngine() (*engine.Engine, string, string) {
 	jobMu.Lock()
 	defer jobMu.Unlock()
 	if job == nil {
@@ -457,7 +437,7 @@ func hSample(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, fmt.Errorf("execution not found"))
 		return
 	}
-	writeJSON(w, map[string]string{"statement": s, "script": TestScript(s)})
+	writeJSON(w, map[string]string{"statement": s, "script": engine.TestScript(s)})
 }
 
 func hExport(w http.ResponseWriter, r *http.Request) {
@@ -467,7 +447,7 @@ func hExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ov := e.Overview()
-	details := map[int]*FamilyDetail{}
+	details := map[int]*engine.FamilyDetail{}
 	for _, f := range ov.Families {
 		if d, ok := e.Detail(f.ID); ok {
 			details[f.ID] = d
@@ -481,10 +461,7 @@ func hExport(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	marker := []byte("<!--STATIC-DATA-->")
-	inj := append([]byte(`<script id="static-data" type="application/json">`), data...)
-	inj = append(inj, []byte(`</script>`)...)
-	out := bytes.Replace(indexHTML, marker, inj, 1)
+	out := web.WithStaticData(data)
 	name := "paramlens-" + time.Now().Format("20060102-1504") + ".html"
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
@@ -499,5 +476,3 @@ func hQuit(w http.ResponseWriter, r *http.Request) {
 		os.Exit(0)
 	}()
 }
-
-var _ = strings.TrimSpace

@@ -1,4 +1,7 @@
-package main
+// Package engine parses rpc_completed statements, groups them into query families and computes
+// parameter statistics and findings. web/engine.js is a line-by-line port of this package and
+// must produce the same JSON (see parity_test.go and scripts/parity.js).
+package engine
 
 import (
 	"bufio"
@@ -21,7 +24,7 @@ const (
 	NMetrics
 )
 
-var metricKeys = [NMetrics]string{"duration", "cpu", "reads", "physical", "writes", "rows"}
+var MetricKeys = [NMetrics]string{"duration", "cpu", "reads", "physical", "writes", "rows"}
 
 type Metrics [NMetrics]int64
 
@@ -173,6 +176,9 @@ func (e *Engine) Close() {
 		e.tmp = nil
 	}
 }
+
+// Started is when the analysis began (for the progress display).
+func (e *Engine) Started() time.Time { return e.started }
 
 func (e *Engine) Finish() {
 	e.mu.Lock()

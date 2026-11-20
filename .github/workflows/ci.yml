@@ -22,8 +22,8 @@ jobs:
       - run: go mod tidy
       - run: go vet ./...
       - run: go test ./...
-      - run: GOOS=windows GOARCH=amd64 go build -o /dev/null .
+      - run: GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/paramlens
       - name: Go × JS engine parity
         run: |
-          PARAMLENS_PARITY_DIR=build/parity go test -count=1 -run TestParityFixtures .
-          node tools/parity.js build/parity
+          PARAMLENS_PARITY_DIR=$PWD/dist/parity go test -count=1 -run TestParityFixtures ./internal/engine
+          node scripts/parity.js dist/parity

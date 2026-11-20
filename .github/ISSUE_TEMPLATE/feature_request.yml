@@ -1,0 +1,21 @@
+name: Feature request
+description: An idea for a new finding, view or source
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: "**Do not paste real data** — anonymize any statement you use as an example."
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to find out or fix in your workload?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: What ParamLens could show or do, and how you would use it.
+    validations:
+      required: true

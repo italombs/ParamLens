@@ -3,5 +3,4 @@
 dist/
 signed/
 *.tmp
-build/
 sample/

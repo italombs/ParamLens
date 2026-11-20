@@ -1,0 +1,47 @@
+name: Bug report
+description: Something does not work or a statement is parsed wrongly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste real data.** Captured statements often contain personal data (patient IDs,
+        names, documents). Replace the values and keep only the shape of the call.
+        Security problems: use the Security tab › Report a vulnerability instead of an issue.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown in the console of the .exe, or the release you downloaded.
+      placeholder: v1.3.0
+    validations:
+      required: true
+  - type: dropdown
+    id: flavor
+    attributes:
+      label: Which one
+      options:
+        - ParamLens.exe (SQL Server table)
+        - ParamLens.exe (.xel file)
+        - ParamLens.exe (exported file)
+        - ParamLens.html
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what you got (error message, wrong finding, …).
+    validations:
+      required: true
+  - type: textarea
+    id: statement
+    attributes:
+      label: Anonymized statement (if it is a parsing problem)
+      description: The `exec sp_executesql …` with the values replaced.
+      render: sql
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: SQL Server version, browser, Windows version.

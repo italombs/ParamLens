@@ -1,9 +1,9 @@
-package main
+package engine_test
 
 // Gera os fixtures do teste de paridade Go × JS (tools/parity.js):
 //
-//	PARAMLENS_PARITY_DIR=build/parity go test -run TestParityFixtures .
-//	node tools/parity.js build/parity
+//	PARAMLENS_PARITY_DIR=$PWD/dist/parity go test -run TestParityFixtures ./internal/engine
+//	node scripts/parity.js dist/parity
 //
 // O arquivo export.tsv segue o formato de exportação v1 (docs/exportacao.md), em
 // UTF-16LE com CRLF, exatamente como o bcp -w grava. Os golden-*.json são a saída
@@ -21,6 +21,9 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf16"
+
+	"github.com/italombs/ParamLens/internal/engine"
+	"github.com/italombs/ParamLens/internal/source"
 )
 
 func escapeExport(s string) string {
@@ -29,7 +32,7 @@ func escapeExport(s string) string {
 }
 
 // casos de borda além do modo demo
-func parityExtraRows() []Row {
+func parityExtraRows() []engine.Row {
 	long := strings.Repeat("a", 198) + "çãõ" + strings.Repeat("x", 50)
 	longFail := "SELECT '" + strings.Repeat("b", 2991) + "ção São João 😀" + strings.Repeat("c", 100) + "'"
 	stmts := []string{
@@ -67,17 +70,17 @@ func parityExtraRows() []Row {
 		// parâmetro sem valor e argumento extra
 		"exec sp_executesql N'select * from t where a = @a and b = @b',N'@a int,@b int',@a=1,@c=3",
 	}
-	var rows []Row
+	var rows []engine.Row
 	for i, s := range stmts {
 		for rep := 0; rep < 1+i%3; rep++ {
-			r := Row{Stmt: s}
-			r.M = Metrics{int64(1000 * (i + 1)), int64(300*(i+1) + rep), int64(10*(i+1) + rep), int64(rep), 0, int64(i)}
+			r := engine.Row{Stmt: s}
+			r.M = engine.Metrics{int64(1000 * (i + 1)), int64(300*(i+1) + rep), int64(10*(i+1) + rep), int64(rep), 0, int64(i)}
 			for k := range r.Has {
 				r.Has[k] = true
 			}
 			if i == 4 && rep == 0 {
-				r.Has = [NMetrics]bool{} // métricas ausentes (NULL no SSMS)
-				r.M = Metrics{}
+				r.Has = [engine.NMetrics]bool{} // métricas ausentes (NULL no SSMS)
+				r.M = engine.Metrics{}
 			}
 			rows = append(rows, r)
 		}
@@ -99,7 +102,7 @@ func TestParityFixtures(t *testing.T) {
 	if s := os.Getenv("PARAMLENS_PARITY_ROWS"); s != "" {
 		n, _ = strconv.Atoi(s)
 	}
-	if err := runDemo(context.Background(), n, func(r Row) { rows = append(rows, r) }); err != nil {
+	if err := source.RunDemo(context.Background(), n, func(r engine.Row) { rows = append(rows, r) }); err != nil {
 		t.Fatal(err)
 	}
 
@@ -113,7 +116,7 @@ func TestParityFixtures(t *testing.T) {
 			ignored++
 		}
 		sb.WriteString("rpc_completed\t2026-11-20T10:" + strconv.Itoa(10+i%50) + ":00.000")
-		for k := 0; k < NMetrics; k++ {
+		for k := 0; k < engine.NMetrics; k++ {
 			sb.WriteByte('\t')
 			if r.Has[k] {
 				sb.WriteString(strconv.FormatInt(r.M[k], 10))
@@ -144,8 +147,8 @@ func TestParityFixtures(t *testing.T) {
 		if i%97 == 0 {
 			cw.Write([]string{"sp_statement_completed", "", "2026-11-20 10:00:00.0000000 +00:00", "1", "1", "1", "0", "1", "0", "0", "SELECT x, y FROM t WHERE a = @p", "", "\x00", "0"})
 		}
-		met := make([]string, NMetrics)
-		for k := 0; k < NMetrics; k++ {
+		met := make([]string, engine.NMetrics)
+		for k := 0; k < engine.NMetrics; k++ {
 			if r.Has[k] {
 				met[k] = strconv.FormatInt(r.M[k], 10)
 			} else {
@@ -153,7 +156,7 @@ func TestParityFixtures(t *testing.T) {
 			}
 		}
 		ts := "2026-11-20 10:" + strconv.Itoa(10+i%50) + ":00.0000000 +00:00"
-		cw.Write([]string{"rpc_completed", ts, ts, "NULL", met[MDur], met[MCpu], met[MPhys], met[MReads], met[MWrites], met[MRows], r.Stmt, "", "\x00", strconv.Itoa(i)})
+		cw.Write([]string{"rpc_completed", ts, ts, "NULL", met[engine.MDur], met[engine.MCpu], met[engine.MPhys], met[engine.MReads], met[engine.MWrites], met[engine.MRows], r.Stmt, "", "\x00", strconv.Itoa(i)})
 	}
 	cw.Flush()
 	if err := os.WriteFile(filepath.Join(dir, "export.csv"), cb.Bytes(), 0o644); err != nil {
@@ -167,7 +170,7 @@ func TestParityFixtures(t *testing.T) {
 	}
 	variants := []variant{{"padrao", false, false}, {"literais-ms", true, true}}
 	for _, v := range variants {
-		eng, err := NewEngine(Options{NormalizeLiterals: v.NormalizeLiterals, UnitMs: v.UnitMs})
+		eng, err := engine.NewEngine(engine.Options{NormalizeLiterals: v.NormalizeLiterals, UnitMs: v.UnitMs})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +179,7 @@ func TestParityFixtures(t *testing.T) {
 		}
 		eng.Finish()
 		ov := eng.Overview()
-		details := map[int]*FamilyDetail{}
+		details := map[int]*engine.FamilyDetail{}
 		samples := map[int]map[string]string{}
 		for _, f := range ov.Families {
 			d, _ := eng.Detail(f.ID)
@@ -185,7 +188,7 @@ func TestParityFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			samples[int(f.Agg.Sample)] = map[string]string{"statement": s, "script": TestScript(s)}
+			samples[int(f.Agg.Sample)] = map[string]string{"statement": s, "script": engine.TestScript(s)}
 			// combinação com todos os parâmetros (exercita o modo "classe")
 			var all []int
 			for i := range d.Params {

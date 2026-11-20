@@ -1,4 +1,6 @@
-package main
+// Package source reads rpc_completed events from SQL Server (a table or a .xel file read by the
+// server) and generates the synthetic demo data.
+package source
 
 import (
 	"context"
@@ -12,6 +14,8 @@ import (
 	"sync"
 
 	_ "github.com/microsoft/go-mssqldb"
+
+	"github.com/italombs/ParamLens/internal/engine"
 )
 
 type ConnReq struct {
@@ -110,7 +114,7 @@ type ServerInfo struct {
 	Current   string   `json:"current"`
 }
 
-func testConn(ctx context.Context, c ConnReq) (*ServerInfo, error) {
+func TestConn(ctx context.Context, c ConnReq) (*ServerInfo, error) {
 	db, err := openDB(c)
 	if err != nil {
 		return nil, err
@@ -143,7 +147,7 @@ type TableInfo struct {
 	Likely bool   `json:"likely"`
 }
 
-func listTables(ctx context.Context, c ConnReq, dbName string) ([]TableInfo, error) {
+func ListTables(ctx context.Context, c ConnReq, dbName string) ([]TableInfo, error) {
 	db, err := openDB(c)
 	if err != nil {
 		return nil, err
@@ -179,7 +183,7 @@ type ColumnInfo struct {
 	Type string `json:"type"`
 }
 
-func listColumns(ctx context.Context, c ConnReq, dbName, schema, table string) ([]ColumnInfo, error) {
+func ListColumns(ctx context.Context, c ConnReq, dbName, schema, table string) ([]ColumnInfo, error) {
 	db, err := openDB(c)
 	if err != nil {
 		return nil, err
@@ -235,7 +239,7 @@ func BuildQuery(s SourceReq) (string, []any, error) {
 			return "", nil, errors.New("choose the database, the table and the statement column")
 		}
 		sel := []string{"CAST(" + qn(stmt) + " AS nvarchar(max))"}
-		for _, m := range metricKeys {
+		for _, m := range engine.MetricKeys {
 			if c := s.Cols[m]; c != "" {
 				sel = append(sel, "TRY_CAST("+qn(c)+" AS bigint)")
 			} else {
@@ -294,7 +298,7 @@ WHERE v.statement IS NOT NULL`
 	return "", nil, fmt.Errorf("unknown source: %s", s.Type)
 }
 
-func runSQLSource(ctx context.Context, c ConnReq, s SourceReq, emit func(Row)) error {
+func RunSQL(ctx context.Context, c ConnReq, s SourceReq, emit func(engine.Row)) error {
 	db, err := openDB(c)
 	if err != nil {
 		return err
@@ -309,7 +313,7 @@ func runSQLSource(ctx context.Context, c ConnReq, s SourceReq, emit func(Row)) e
 	}
 	defer rows.Close()
 	var stmt sql.NullString
-	var m [NMetrics]sql.NullInt64
+	var m [engine.NMetrics]sql.NullInt64
 	dst := []any{&stmt}
 	for k := range m {
 		dst = append(dst, &m[k])
@@ -318,7 +322,7 @@ func runSQLSource(ctx context.Context, c ConnReq, s SourceReq, emit func(Row)) e
 		if err := rows.Scan(dst...); err != nil {
 			return err
 		}
-		r := Row{Stmt: stmt.String}
+		r := engine.Row{Stmt: stmt.String}
 		for k := range m {
 			if m[k].Valid {
 				r.M[k] = m[k].Int64
@@ -335,7 +339,7 @@ func runSQLSource(ctx context.Context, c ConnReq, s SourceReq, emit func(Row)) e
 
 // ---------------- modo demo (dados sintéticos estilo OutSystems) ----------------
 
-func runDemo(ctx context.Context, n int, emit func(Row)) error {
+func RunDemo(ctx context.Context, n int, emit func(engine.Row)) error {
 	if n <= 0 {
 		n = 20000
 	}
@@ -363,7 +367,7 @@ ORDER BY [ENDOC].[CREATEDON] DESC`
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		var r Row
+		var r engine.Row
 		switch x := rnd.Intn(100); {
 		case x < 70:
 			types := []string{"1,2,3", "1,2,3,7", "1,2,3", "4", "1,2,3,7,9,12"}[rnd.Intn(5)]
@@ -406,8 +410,8 @@ ORDER BY [ENDOC].[CREATEDON] DESC`
 			if start != "1900-01-01 00:00:00" {
 				reads += int64(20000 + rnd.Intn(5000))
 			}
-			r = Row{Stmt: stmt}
-			r.M = Metrics{reads * 9, reads * 6, reads, int64(rnd.Intn(20)), 0, 1}
+			r = engine.Row{Stmt: stmt}
+			r.M = engine.Metrics{reads * 9, reads * 6, reads, int64(rnd.Intn(20)), 0, 1}
 		case x < 92:
 			all := 1
 			ep := "NULL"
@@ -418,14 +422,14 @@ ORDER BY [ENDOC].[CREATEDON] DESC`
 			stmt := fmt.Sprintf("exec sp_executesql N'%s',N'@qpinMaxRecords int,@qpinOwnerTypeIdPatient int,@qploEncounter_PatientId bigint,@qpboAllEpisodes bit,@qploEpisodeID nvarchar(4000),@qpinImportance_Regular int,@qpinImportance_High int',@qpinMaxRecords=50,@qpinOwnerTypeIdPatient=1,@qploEncounter_PatientId=%d,@qpboAllEpisodes=%d,@qploEpisodeID=%s,@qpinImportance_Regular=1,@qpinImportance_High=2",
 				strings.ReplaceAll(episodes, "'", "''"), 100000+rnd.Intn(50000), all, ep)
 			reads := int64(40 + rnd.Intn(30))
-			r = Row{Stmt: stmt}
-			r.M = Metrics{reads * 30, reads * 10, reads, 0, 0, int64(rnd.Intn(50))}
+			r = engine.Row{Stmt: stmt}
+			r.M = engine.Metrics{reads * 30, reads * 10, reads, 0, 0, int64(rnd.Intn(50))}
 		case x < 99:
 			stmt := fmt.Sprintf("exec [dbo].[usp_GetPatientTimeline] @PatientId=%d,@FromDate='2026-%02d-01',@IncludeArchived=%d", 100000+rnd.Intn(50000), 1+rnd.Intn(11), rnd.Intn(2))
-			r = Row{Stmt: stmt}
-			r.M = Metrics{int64(5000 + rnd.Intn(5000)), int64(2000 + rnd.Intn(2000)), int64(300 + rnd.Intn(300)), 0, 0, 10}
+			r = engine.Row{Stmt: stmt}
+			r.M = engine.Metrics{int64(5000 + rnd.Intn(5000)), int64(2000 + rnd.Intn(2000)), int64(300 + rnd.Intn(300)), 0, 0, 10}
 		default:
-			r = Row{Stmt: "exec sp_executesql @stmt"}
+			r = engine.Row{Stmt: "exec sp_executesql @stmt"}
 		}
 		for k := range r.Has {
 			r.Has[k] = true
@@ -434,4 +438,3 @@ ORDER BY [ENDOC].[CREATEDON] DESC`
 	}
 	return nil
 }
-
