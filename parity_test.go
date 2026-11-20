@@ -10,8 +10,10 @@ package main
 // do motor Go para as mesmas linhas.
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/csv"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -129,6 +131,32 @@ func TestParityFixtures(t *testing.T) {
 		binary.LittleEndian.PutUint16(buf[2*i:], c)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "export.tsv"), buf, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// export.csv: the same events as a SELECT * of an XE table saved as CSV by SSMS
+	// (header, extra columns in another order, RFC 4180 quoting, raw line breaks, UTF-8 BOM)
+	var cb bytes.Buffer
+	cb.WriteString("\xEF\xBB\xBF")
+	cw := csv.NewWriter(&cb) // UseCRLF would also rewrite line breaks inside the statements
+	cw.Write([]string{"name", "timestamp", "timestamp (UTC)", "object_id", "duration", "cpu_time", "physical_reads", "logical_reads", "writes", "row_count", "statement", "sql_text", "data_stream", "id"})
+	for i, r := range rows {
+		if i%97 == 0 {
+			cw.Write([]string{"sp_statement_completed", "", "2026-11-20 10:00:00.0000000 +00:00", "1", "1", "1", "0", "1", "0", "0", "SELECT x, y FROM t WHERE a = @p", "", "\x00", "0"})
+		}
+		met := make([]string, NMetrics)
+		for k := 0; k < NMetrics; k++ {
+			if r.Has[k] {
+				met[k] = strconv.FormatInt(r.M[k], 10)
+			} else {
+				met[k] = "NULL"
+			}
+		}
+		ts := "2026-11-20 10:" + strconv.Itoa(10+i%50) + ":00.0000000 +00:00"
+		cw.Write([]string{"rpc_completed", ts, ts, "NULL", met[MDur], met[MCpu], met[MPhys], met[MReads], met[MWrites], met[MRows], r.Stmt, "", "\x00", strconv.Itoa(i)})
+	}
+	cw.Flush()
+	if err := os.WriteFile(filepath.Join(dir, "export.csv"), cb.Bytes(), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

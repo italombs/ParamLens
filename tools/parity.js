@@ -23,6 +23,17 @@ function reencode(buf) {
   return [["UTF-16LE no BOM, CRLF (bcp -w)", buf], ["UTF-8 with BOM, LF", utf8bom], ["UTF-16LE with BOM", u16bom]];
 }
 
+// CSV with a header row (SELECT * saved by SSMS), in UTF-8 with BOM and in UTF-16LE
+function csvVariants() {
+  const p = path.join(dir, "export.csv");
+  if (!fs.existsSync(p)) return [];
+  const buf = fs.readFileSync(p);
+  if (buf.length > 200 * 1024 * 1024) return [["CSV UTF-8 with BOM", buf]];
+  const text = buf.toString("utf8").replace(/^﻿/, "");
+  const u16 = Buffer.concat([Buffer.from([0xFF, 0xFE]), Buffer.from(text, "utf16le")]);
+  return [["CSV UTF-8 with BOM", buf], ["CSV UTF-16LE with BOM", u16]];
+}
+
 // ignore serialization-only differences: null/""/[] mean absent (Go omitempty / nil slices)
 function canon(v) {
   if (Array.isArray(v)) return v.map(canon);
@@ -65,7 +76,7 @@ function diff(a, b, p, out) {
   let failures = 0;
   for (const v of variants) {
     const golden = JSON.parse(fs.readFileSync(path.join(dir, `golden-${v.name}.json`), "utf8"));
-    for (const [encName, bytes] of reencode(tsv)) {
+    for (const [encName, bytes] of reencode(tsv).concat(csvVariants())) {
       const t0 = Date.now();
       const { engine, info } = await PL.analyzeFile(new Blob([bytes]), { normalizeLiterals: v.normalizeLiterals, unitMs: v.unitMs });
       const ov = engine.overview();

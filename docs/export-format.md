@@ -25,6 +25,25 @@ One line per event, 9 TAB-separated columns, in this order:
 - The file is read in chunks (it is never loaded whole into memory); about 1 GB / 400k events takes
   ~40 s in the browser.
 
+## Shortcut: CSV/TXT with a header row
+
+A plain `SELECT *` of an event table saved by SSMS also works. The first row must be a header; the
+columns are matched by name (case-insensitive) and the others are ignored:
+
+| Field | Accepted header names |
+|---|---|
+| event | `event`, `name`, `event_name` |
+| timestamp | `timestamp (UTC)`, `timestamp_utc`, `timestamp` |
+| metrics | `duration`, `cpu_time`/`cpu`, `logical_reads`/`reads`, `physical_reads`, `writes`, `row_count`/`rows` |
+| statement (required) | `statement` |
+
+- The separator (comma, semicolon or TAB) is detected from the header.
+- Fields follow RFC 4180: a field with a separator, quote or line break must be quoted, with quotes
+  doubled. In SSMS turn on *Tools › Options › Query Results › SQL Server › Results to Grid › Quote
+  strings containing list separators when saving .csv results*; without it, statements with commas
+  break the columns (the page reports those rows).
+- The SSMS 65,535-character cell limit still applies; bcp has no limit.
+
 ## Query for a `.xel` file
 
 ```sql
@@ -58,7 +77,7 @@ that carries the parameter values.
 
 ```sql
 SELECT CAST([name] AS nvarchar(60)),
-       CONVERT(varchar(27), TRY_CAST([timestamp_utc] AS datetime2(3)), 126),
+       CONVERT(varchar(27), TRY_CAST([timestamp (UTC)] AS datetime2(3)), 126),
        TRY_CAST([duration] AS bigint), TRY_CAST([cpu_time] AS bigint), TRY_CAST([logical_reads] AS bigint),
        TRY_CAST([physical_reads] AS bigint), TRY_CAST([writes] AS bigint), TRY_CAST([row_count] AS bigint),
        REPLACE(REPLACE(REPLACE(REPLACE(CAST([statement] AS nvarchar(max)), N'\', N'\\'), NCHAR(13), N'\r'), NCHAR(10), N'\n'), NCHAR(9), N'\t')

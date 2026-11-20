@@ -56,19 +56,23 @@ on commas inside strings, `',@` inside the SQL, multiple IN lists, etc.
 Internal metrics: `duration` and `cpu_time` in **microseconds** (XE default; ms option on the source).
 Default cost metric: logical reads → CPU → duration (the first one available).
 
-Export file format ("ParamLens TSV v1"): see `docs/export-format.md` (9 TAB columns: event, timestamp,
-6 metrics, escaped statement).
+Exported files accepted by the JS reader (see `docs/export-format.md`): "ParamLens TSV v1" (9 TAB
+columns: event, timestamp, 6 metrics, escaped statement) or any CSV/TXT with a header row (columns
+matched by name, RFC 4180 quoting, separator detected; `detectFormat`/`forEachRecord` in `engine.js`).
 
 ## Current state
-- Published at https://github.com/italombs/ParamLens (public, MIT). Release `v1.0.0` exists (exe only);
-  the HTML version and i18n are not released yet.
-- Unit tests, parity test (6k and 400k rows) and the UI smoke test (Playwright, 51 checks, both languages)
-  pass. JS engine: ~40 s / 400k events / 1.1 GB file in Node, ~230 MB heap (Go: ~17 s).
+- Published at https://github.com/italombs/ParamLens (public, MIT). Releases `v1.0.0` (exe) and
+  `v1.1.0` (exe + html + i18n). Every release keeps its assets; README links `releases/latest/download/`.
+- Unit tests, parity test (6k and 400k rows; TSV and CSV, UTF-8/UTF-16) and the UI smoke test
+  (Playwright, both languages) pass. JS engine: ~40 s / 400k events / 1.1 GB file in Node, ~230 MB heap (Go: ~17 s).
+- The user's real event table `dbo.__xe_event_file` (an SSMS XEvent "export to table") has 37 columns,
+  among them `name`, `timestamp (UTC)`, `duration`, `cpu_time`, `logical_reads`, `physical_reads`,
+  `writes`, `row_count`, `statement`, `sql_text`, and mixes `rpc_completed`, `sp_statement_completed`
+  and `sql_statement_completed`. A `TOP 1000` CSV sample (kept locally in `sample/`, git-ignored: it holds
+  patient data — never commit or print its values) parses 70/70 rpc events in the JS engine.
 - **The `.exe` has never run against a real SQL Server.** Validate first: connection (Windows/SQL auth,
-  named instance, encrypt), table/column listing, table source query, `.xel` query. The user has a real
-  server; the event table `dbo.__xe_event_file` mixes `rpc_completed`, `sp_statement_completed` and
-  `sql_statement_completed` (column names still to be confirmed by the user).
-- The export queries/bcp command were not yet run on a real server either.
+  named instance, encrypt), table/column listing, table source query, `.xel` query.
+- The generated export queries/bcp command were not yet run on the real server.
 - On the company PC the unsigned `.exe` is blocked by SmartScreen **without** a "Run anyway" option.
 - Next: apply at https://signpath.org/apply (the signing step runs only when the variable
   `SIGNPATH_ORGANIZATION_ID` and the secret `SIGNPATH_API_TOKEN` exist).

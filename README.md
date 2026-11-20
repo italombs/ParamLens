@@ -14,7 +14,9 @@ The interface is in English by default and can be switched to Portuguese (pt-BR)
 
 ## Download
 
-From [Releases](../../releases):
+Latest version: [ParamLens.exe](../../releases/latest/download/ParamLens.exe) ·
+[ParamLens.html](../../releases/latest/download/ParamLens.html). Every version ever published stays
+available on the [Releases](../../releases) page, each with its `.sha256` checksum.
 
 - **`ParamLens.exe`**: a single executable, no installation. It starts a local interface on
   `http://127.0.0.1:<port>`, opens the browser and connects to SQL Server.
@@ -42,7 +44,7 @@ From [Releases](../../releases):
 |---|---|
 | Table | Any table with the `statement` field (automatic column mapping) |
 | `.xel` file | Read by SQL Server itself through `sys.fn_xe_file_target_read_file` (requires `VIEW SERVER STATE`) |
-| Exported file | TSV created by `bcp` or by SSMS ([format](docs/export-format.md)); in the `.html` and in the `.exe` |
+| Exported file | TSV created by `bcp` or by SSMS ([format](docs/export-format.md)), or a CSV/TXT with a header row such as a `SELECT *` of the event table saved by SSMS; in the `.html` and in the `.exe` |
 
 `duration`/`cpu_time` unit: microseconds (XE default) or milliseconds.
 

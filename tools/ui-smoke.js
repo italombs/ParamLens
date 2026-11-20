@@ -88,6 +88,26 @@ async function checkResults(page, label, { samples }) {
   check(/Ignored: event sp_statement_completed\s*63/.test(fails), "html: ignored events counted");
   check(/UTF-16 LE/.test(fails) && /Header\s*yes/.test(fails), "html: encoding and header");
   check(/Period/.test(fails) && /not an EXEC call/.test(fails), "html: period and failure reasons");
+  check(/Format\s*ParamLens TSV v1/.test(fails), "html: TSV format detected");
+
+  // CSV with a header row (SELECT * saved by SSMS)
+  const csvPath = path.join(path.dirname(tsvPath), "export.csv");
+  if (fs.existsSync(csvPath)) {
+    await page.click("#btnNew");
+    await analyzeFile(page, csvPath);
+    check((await page.$$("#famList .fam")).length === 16, "csv: 16 queries");
+    await page.click("#mainTabs button[data-v=fails]");
+    const fcsv = await page.textContent("#tFails");
+    check(/Format\s*CSV · 14 columns/.test(fcsv) && /Ignored: event sp_statement_completed\s*63/.test(fcsv), "csv: format and ignored events");
+    await page.click("#famList .fam");
+    await page.click("#tFamily [data-sample]");
+    await page.waitForFunction(() => /DECLARE/.test(document.querySelector("#sampleTxt").textContent));
+    check(true, "csv: sample re-read from the file");
+    await page.click("#btnCloseSample");
+    await page.click("#mainTabs button[data-v=findings]");
+    await page.click("#btnNew");
+    await analyzeFile(page, tsvPath);
+  }
   await page.click("#mainTabs button[data-v=findings]");
   await page.screenshot({ path: path.join(shots, "2-results-en.png") });
 

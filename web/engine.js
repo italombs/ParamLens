@@ -1431,80 +1431,213 @@ async function forEachLine(blob, encInfo, onLine, onProgress, isCanceled) {
   return true;
 }
 
-/* Lê o arquivo exportado e alimenta um Engine.
- * opts: { normalizeLiterals, unitMs, eventName (padrão rpc_completed), like, onProgress(info), isCanceled() }
- * Devolve { engine, info, canceled }. */
+/* ---------- delimited files with a header row (CSV/TXT saved from SSMS, SELECT *) ---------- */
+
+// header names accepted for each field (case-insensitive, first match wins)
+const HEADER_COLS = {
+  event: ["event", "name", "event_name"],
+  ts: ["timestamp (utc)", "timestamp_utc", "timestamp"],
+  m: [["duration"], ["cpu_time", "cpu"], ["logical_reads", "reads"], ["physical_reads"], ["writes"], ["row_count", "rows"]],
+  stmt: ["statement"],
+};
+const FAIL_COLS = "record does not match the header (expected {0} columns, found {1}; fields with commas or line breaks must be quoted)";
+
+// one RFC 4180 record -> fields (quotes only open a field when they are its first character)
+function parseDelimited(text, d) {
+  const out = [];
+  let cur = "", st = 0; // 0 field start, 1 unquoted, 2 quoted, 3 quote inside quoted
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (st === 2) { if (c === '"') st = 3; else cur += c; continue; }
+    if (st === 3) {
+      if (c === '"') { cur += '"'; st = 2; continue; }
+      if (c === d) { out.push(cur); cur = ""; st = 0; continue; }
+      cur += c; st = 1; continue;
+    }
+    if (c === d) { out.push(cur); cur = ""; st = 0; continue; }
+    if (st === 0 && c === '"') { st = 2; continue; }
+    cur += c; st = 1;
+  }
+  out.push(cur);
+  return out;
+}
+
+// decides how to read the file from its first line
+function detectFormat(firstLine) {
+  const tabs = firstLine.split("\t");
+  const low = s => s.trim().replace(/^"|"$/g, "").toLowerCase();
+  if (tabs.length === EXPORT_COLS && low(tabs[0]) === "event" && low(tabs[EXPORT_COLS - 1]) === "statement") {
+    return { kind: "tsv", header: true, label: "ParamLens TSV v1" };
+  }
+  const counts = [["\t", tabs.length - 1], [",", firstLine.split(",").length - 1], [";", firstLine.split(";").length - 1]];
+  counts.sort((a, b) => b[1] - a[1]);
+  const d = counts[0][0];
+  if (counts[0][1] > 0) {
+    const names = parseDelimited(firstLine, d).map(low);
+    const find = cands => { for (const c of cands) { const i = names.indexOf(c); if (i >= 0) return i; } return -1; };
+    const stmt = find(HEADER_COLS.stmt);
+    if (stmt >= 0) {
+      return {
+        kind: "csv", header: true, delim: d, cols: names.length, stmt, event: find(HEADER_COLS.event), ts: find(HEADER_COLS.ts),
+        m: HEADER_COLS.m.map(find),
+        label: (d === "\t" ? "TAB" : d === "," ? "CSV" : "CSV (;)") + " · " + names.length + " columns",
+      };
+    }
+  }
+  return { kind: "tsv", header: false, label: "ParamLens TSV v1" };
+}
+
+/* Splits a Blob/File into records honoring quotes (CSV), without loading it whole.
+ * Works on UTF-8/ANSI and UTF-16 code units. onRec(text, offset, lengthInBytes). */
+async function forEachRecord(blob, encInfo, delim, onRec, onProgress, isCanceled) {
+  const dec = new TextDecoder(encInfo.enc);
+  const reader = blob.slice(encInfo.skip).stream().getReader();
+  const u = encInfo.unit, le = encInfo.le;
+  const at = u === 1 ? (b, j) => b[j] : le ? (b, j) => b[j] | (b[j + 1] << 8) : (b, j) => (b[j] << 8) | b[j + 1];
+  const D = delim.charCodeAt(0);
+  let carry = new Uint8Array(0), scanned = 0, st = 0, base = encInfo.skip, lastYield = Date.now();
+  const emit = (buf, s, e) => {
+    if (e - s >= u && at(buf, e - u) === 13) e -= u;
+    onRec(dec.decode(buf.subarray(s, e)), base + s, e - s);
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    let buf = value;
+    if (carry.length) {
+      buf = new Uint8Array(carry.length + value.length);
+      buf.set(carry, 0);
+      buf.set(value, carry.length);
+    }
+    let s = 0, j = scanned;
+    for (; j + u <= buf.length; j += u) {
+      const c = at(buf, j);
+      if (st === 2) { if (c === 34) st = 3; continue; }
+      if (st === 3 && c === 34) { st = 2; continue; }
+      if (c === 10) { emit(buf, s, j); s = j + u; st = 0; continue; }
+      if (c === D) { st = 0; continue; }
+      st = st === 0 && c === 34 ? 2 : 1;
+    }
+    base += s;
+    carry = buf.subarray(s);
+    scanned = j - s;
+    if (isCanceled && isCanceled()) { try { reader.cancel(); } catch (e) { /* ignore */ } return false; }
+    if (Date.now() - lastYield > 60) {
+      if (onProgress) onProgress(base - encInfo.skip, blob.size - encInfo.skip);
+      await tick();
+      lastYield = Date.now();
+    }
+  }
+  if (carry.length) emit(carry, 0, carry.length - (carry.length % u));
+  if (onProgress) onProgress(blob.size - encInfo.skip, blob.size - encInfo.skip);
+  return true;
+}
+
+/* Reads the exported file and feeds an Engine.
+ * Accepts "ParamLens TSV v1" (docs/export-format.md) or a CSV/TXT with a header row whose columns
+ * are matched by name (needs a "statement" column).
+ * opts: { normalizeLiterals, unitMs, eventName (default rpc_completed), like, onProgress(info, engine), isCanceled() }
+ * Returns { engine, info, canceled }. */
 async function analyzeFile(blob, opts) {
   opts = opts || {};
   const eng = new Engine(opts);
   const head = new Uint8Array(await blob.slice(0, 65536).arrayBuffer());
   const encInfo = detectEncoding(head);
+  const headText = new TextDecoder(encInfo.enc).decode(head.subarray(encInfo.skip));
+  const nl = headText.indexOf("\n");
+  const fmt = detectFormat((nl >= 0 ? headText.slice(0, nl) : headText).replace(/\r$/, ""));
+  encInfo.fmt = fmt;
   const evName = (opts.eventName || "rpc_completed").trim().toLowerCase();
   const like = opts.like && opts.like.trim() ? likeToRegExp(opts.like.trim()) : null;
   const info = {
-    encoding: ENC_LABEL[encInfo.enc] || encInfo.enc, encId: encInfo.enc, size: blob.size,
-    lines: 0, header: false, ignored: {}, filtered: 0, badFormat: 0, truncated: 0,
+    encoding: ENC_LABEL[encInfo.enc] || encInfo.enc, encId: encInfo.enc, format: fmt.label, size: blob.size,
+    lines: 0, header: fmt.header, ignored: {}, filtered: 0, badFormat: 0, truncated: 0,
     tsMin: "", tsMax: "", bytesRead: 0,
   };
-  let first = true;
-  const onLine = (line, off, len) => {
-    if (line === "" || (line.length < 3 && trimSpace(line) === "")) return;
-    info.lines++;
-    const f = splitExportLine(line);
-    if (first) {
-      first = false;
-      if (f && f[0].trim().toLowerCase() === "event") { info.header = true; info.lines--; return; }
-    }
-    if (!f) {
-      info.badFormat++;
-      eng.ingestFailure(FAIL_FORMAT + (line.indexOf(",") >= 0 && line.indexOf("\t") < 0 ? FAIL_CSV : "") + ")", line);
-      return;
-    }
-    const ev = f[0].trim();
+
+  // common handling of one event, whatever the file format
+  const handle = (ev, ts, metrics, raw, stmt, off, len) => {
+    ev = ev.trim();
     if (ev !== "" && ev.toLowerCase() !== evName) { info.ignored[ev] = (info.ignored[ev] || 0) + 1; return; }
-    let raw = f[EXPORT_COLS - 1];
-    if (raw === "NULL") raw = "";
-    const stmt = unescapeStmt(raw);
     if (like && !like.test(stmt)) { info.filtered++; return; }
     if (raw.length === SSMS_CELL_LIMIT) {
       info.truncated++;
       eng.ingestFailure(FAIL_CUT, stmt);
       return;
     }
-    const ts = f[1].trim();
+    ts = ts.trim();
     if (ts && ts !== "NULL") {
       if (!info.tsMin || ts < info.tsMin) info.tsMin = ts;
       if (!info.tsMax || ts > info.tsMax) info.tsMax = ts;
     }
     const m = [0, 0, 0, 0, 0, 0], has = [false, false, false, false, false, false];
     for (let k = 0; k < NM; k++) {
-      const v = parseMetric(f[2 + k]);
+      const v = metrics[k] == null ? null : parseMetric(metrics[k]);
       if (v !== null) { m[k] = v; has[k] = true; }
     }
     eng.ingest(stmt, m, has, off, len);
   };
-  const ok = await forEachLine(blob, encInfo, onLine, (done, total) => {
-    info.bytesRead = done;
-    if (opts.onProgress) opts.onProgress(info, eng);
-  }, opts.isCanceled);
+  const blank = line => line === "" || (line.length < 3 && trimSpace(line) === "");
+  let first = true;
+
+  const onLine = (line, off, len) => {
+    if (blank(line)) return;
+    if (first) { first = false; if (fmt.header) return; }
+    info.lines++;
+    const f = splitExportLine(line);
+    if (!f) {
+      info.badFormat++;
+      eng.ingestFailure(FAIL_FORMAT + (line.indexOf(",") >= 0 && line.indexOf("\t") < 0 ? FAIL_CSV : "") + ")", line);
+      return;
+    }
+    let raw = f[EXPORT_COLS - 1];
+    if (raw === "NULL") raw = "";
+    handle(f[0], f[1], f.slice(2, 2 + NM), raw, unescapeStmt(raw), off, len);
+  };
+
+  const onRec = (text, off, len) => {
+    if (blank(text)) return;
+    if (first) { first = false; return; } // header row
+    info.lines++;
+    const f = parseDelimited(text, fmt.delim);
+    if (f.length !== fmt.cols) {
+      info.badFormat++;
+      eng.ingestFailure(FAIL_COLS.replace("{0}", fmt.cols).replace("{1}", f.length), text);
+      return;
+    }
+    let raw = f[fmt.stmt];
+    if (raw === "NULL") raw = "";
+    handle(fmt.event >= 0 ? f[fmt.event] : "", fmt.ts >= 0 ? f[fmt.ts] : "", fmt.m.map(i => (i >= 0 ? f[i] : null)), raw, raw, off, len);
+  };
+
+  const progress = done => { info.bytesRead = done; if (opts.onProgress) opts.onProgress(info, eng); };
+  const ok = fmt.kind === "csv"
+    ? await forEachRecord(blob, encInfo, fmt.delim, onRec, progress, opts.isCanceled)
+    : await forEachLine(blob, encInfo, onLine, progress, opts.isCanceled);
   eng.finish();
   info.encInfo = encInfo;
   return { engine: eng, info, canceled: !ok };
 }
 
-// relê o statement de uma execução direto do arquivo
+// re-reads the statement of one execution straight from the file
 async function readStatementAt(blob, encInfo, off, len) {
   const b = new Uint8Array(await blob.slice(off, off + len).arrayBuffer());
   const line = new TextDecoder(encInfo.enc).decode(b);
+  const fmt = encInfo.fmt || { kind: "tsv" };
+  let raw;
+  if (fmt.kind === "csv") {
+    raw = parseDelimited(line, fmt.delim)[fmt.stmt] || "";
+    return trimSpace(raw === "NULL" ? "" : raw);
+  }
   const f = splitExportLine(line);
   if (!f) return "";
-  const raw = f[EXPORT_COLS - 1];
+  raw = f[EXPORT_COLS - 1];
   return trimSpace(unescapeStmt(raw === "NULL" ? "" : raw));
 }
 
 return {
   Engine, analyzeFile, readStatementAt, testScript, parseRPC, normalizeSQL, detectPatterns, tokenize,
-  sqlEqual, unescapeStmt, splitExportLine, detectEncoding, likeToRegExp, EXPORT_COLS,
+  sqlEqual, unescapeStmt, splitExportLine, parseDelimited, detectFormat, detectEncoding, likeToRegExp, EXPORT_COLS,
   _internal: { utf8Len, utf8Prefix, cmpStr, clipValue, classOf, normDate, parseNum },
 };
 });

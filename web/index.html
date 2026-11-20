@@ -279,6 +279,7 @@ ol.steps li{margin:2px 0}
       <li data-i18n="exp.s1"></li>
       <li data-i18n-html="exp.s2"></li>
       <li data-i18n="exp.s3"></li>
+      <li data-i18n="exp.s4"></li>
     </ol>
     <pre class="sql" id="expSql"></pre>
   </div>
@@ -364,7 +365,7 @@ en: {
   "src.normLit":"Group queries that differ only in literals", "src.analyze":"Analyze", "src.preview":"Show query",
   "loading":"loading…", "noTables":"— no tables —", "tblRows":"{0} rows", "none":"(none)",
   "col.ev":"Event name", "col.ts":"Date/time",
-  "file.title":"1. Exported file", "file.drop":"Drop the file here", "file.dropHint":"or click to choose · created by bcp or by SSMS \"Save Results As\"",
+  "file.title":"1. Exported file", "file.drop":"Drop the file here", "file.dropHint":"or click to choose · TSV from the export described beside, or a CSV/TXT with a header row (e.g. SELECT * saved by SSMS)",
   "file.event":"Event to analyze", "file.like":"Statement LIKE (optional; %, _ and [..] as in T-SQL)",
   "file.private":"The file is read only in this browser: nothing is sent anywhere.", "file.back":"Back to the SQL Server connection",
   "file.noEngine":"The analysis engine is missing from this page: open the ParamLens.html from the release.",
@@ -376,6 +377,7 @@ en: {
   "exp.s1":"Run the query below with results to grid (Ctrl+D).",
   "exp.s2":"Right-click the grid › <b>Save Results As…</b> › type <b>Text (Tab delimited) (*.txt)</b>.",
   "exp.s3":"The SSMS grid cuts each cell at 65,535 characters: longer statements show up here as \"cut\". In that case, use bcp.",
+  "exp.s4":"Shortcut: a plain SELECT * of the event table saved as CSV also works (columns are matched by name), as long as SSMS quotes the fields: Tools › Options › Query Results › SQL Server › Results to Grid › \"Quote strings containing list separators when saving .csv results\".",
   "copy":"Copy", "copied":"Copied ✓", "close":"Close", "cancel":"Cancel",
   "sort.cost":"by cost", "sort.execs":"by executions", "sort.sev":"by findings", "res.filter":"filter by text…",
   "tab.findings":"All findings", "tab.family":"Selected query", "tab.fails":"Not parsed",
@@ -392,7 +394,7 @@ en: {
   "trunc.title":"{0} statement(s) cut at 65,535 characters by the SSMS grid",
   "trunc.detail":"These rows were left out of the analysis (\"Not parsed\" tab). Export with bcp to read the full statements.",
   "fails.none":"All rows were parsed.", "fails.title":"{0} row(s) not parsed", "fails.reason":"Reason", "fails.rows":"Rows", "fails.examples":"Examples",
-  "fi.title":"File", "fi.enc":"Encoding", "fi.lines":"Data rows", "fi.header":"Header", "yes":"yes", "no":"no", "fi.period":"Period", "fi.periodVal":"{0} to {1}",
+  "fi.title":"File", "fi.format":"Format", "fi.enc":"Encoding", "fi.lines":"Data rows", "fi.header":"Header", "yes":"yes", "no":"no", "fi.period":"Period", "fi.periodVal":"{0} to {1}",
   "fi.ignored":"Ignored: event {0}", "fi.filtered":"Outside the LIKE filter", "fi.bad":"Wrong format (9 TAB-separated columns)", "fi.cut":"Cut by SSMS (65,535 characters)",
   "pat.title":"Catch-all predicates (OR / ISNULL)",
   "pat.legend":"% of executions in which the parameter-side condition is true — when true, the other side of the OR filters nothing.",
@@ -430,7 +432,7 @@ en: {
   "src.normLit":"Agrupar queries que só mudam literais", "src.analyze":"Analisar", "src.preview":"Ver query",
   "loading":"carregando…", "noTables":"— nenhuma tabela —", "tblRows":"{0} linhas", "none":"(nenhuma)",
   "col.ev":"Nome do evento", "col.ts":"Data/hora",
-  "file.title":"1. Arquivo exportado", "file.drop":"Arraste o arquivo aqui", "file.dropHint":"ou clique para escolher · gerado pelo bcp ou pelo \"Save Results As\" do SSMS",
+  "file.title":"1. Arquivo exportado", "file.drop":"Arraste o arquivo aqui", "file.dropHint":"ou clique para escolher · TSV da exportação ao lado, ou um CSV/TXT com cabeçalho (ex.: SELECT * salvo pelo SSMS)",
   "file.event":"Evento analisado", "file.like":"Statement LIKE (opcional; %, _ e [..] como no T-SQL)",
   "file.private":"O arquivo é lido só neste navegador: nada é enviado para lugar nenhum.", "file.back":"Voltar para a conexão com o SQL Server",
   "file.noEngine":"Motor de análise ausente nesta página: abra o ParamLens.html da release.",
@@ -442,6 +444,7 @@ en: {
   "exp.s1":"Rode a query abaixo com resultado em grid (Ctrl+D).",
   "exp.s2":"Clique com o botão direito no grid › <b>Save Results As…</b> › tipo <b>Text (Tab delimited) (*.txt)</b>.",
   "exp.s3":"O grid do SSMS corta cada célula em 65.535 caracteres: statements maiores aparecem como \"cortados\" aqui. Nesse caso, use o bcp.",
+  "exp.s4":"Atalho: um SELECT * simples da tabela de eventos salvo como CSV também funciona (as colunas são reconhecidas pelo nome), desde que o SSMS coloque aspas nos campos: Tools › Options › Query Results › SQL Server › Results to Grid › \"Quote strings containing list separators when saving .csv results\".",
   "copy":"Copiar", "copied":"Copiado ✓", "close":"Fechar", "cancel":"Cancelar",
   "sort.cost":"por custo", "sort.execs":"por execuções", "sort.sev":"por achados", "res.filter":"filtrar por texto…",
   "tab.findings":"Todos os achados", "tab.family":"Query selecionada", "tab.fails":"Não interpretados",
@@ -458,7 +461,7 @@ en: {
   "trunc.title":"{0} statement(s) cortado(s) em 65.535 caracteres pelo grid do SSMS",
   "trunc.detail":"Essas linhas ficaram fora da análise (aba \"Não interpretados\"). Exporte com o bcp para ler os statements inteiros.",
   "fails.none":"Todas as linhas foram interpretadas.", "fails.title":"{0} linha(s) não interpretada(s)", "fails.reason":"Motivo", "fails.rows":"Linhas", "fails.examples":"Exemplos",
-  "fi.title":"Arquivo", "fi.enc":"Codificação", "fi.lines":"Linhas de dados", "fi.header":"Cabeçalho", "yes":"sim", "no":"não", "fi.period":"Período", "fi.periodVal":"{0} a {1}",
+  "fi.title":"Arquivo", "fi.format":"Formato", "fi.enc":"Codificação", "fi.lines":"Linhas de dados", "fi.header":"Cabeçalho", "yes":"sim", "no":"não", "fi.period":"Período", "fi.periodVal":"{0} a {1}",
   "fi.ignored":"Ignoradas: evento {0}", "fi.filtered":"Fora do filtro LIKE", "fi.bad":"Fora do formato (9 colunas com TAB)", "fi.cut":"Cortadas pelo SSMS (65.535 caracteres)",
   "pat.title":"Predicados catch-all (OR / ISNULL)",
   "pat.legend":"% de execuções em que a condição do lado do parâmetro é verdadeira — quando verdadeira, o outro lado do OR não filtra nada.",
@@ -494,6 +497,7 @@ const PT_MESSAGES = [
   [/^choose the database, the table and the statement column$/, "escolha a base, a tabela e a coluna do statement"],
   [/^enter the \.xel path \(on the server\)$/, "informe o caminho do .xel (no servidor)"], [/^unknown source: (.*)$/, "fonte desconhecida: $1"],
   [/^invalid host$/, "host inválido"], [/^invalid token — reopen the link shown in the console$/, "token inválido — reabra pelo link mostrado no console"],
+  [/^record does not match the header \(expected (\d+) columns, found (\d+); fields with commas or line breaks must be quoted\)$/, "registro não bate com o cabeçalho (esperadas $1 colunas, encontradas $2; campos com vírgula ou quebra de linha precisam estar entre aspas)"],
   [/^not available in file mode$/, "indisponível no modo arquivo"],
 ];
 
@@ -853,6 +857,7 @@ function renderFails(){
     const ign = Object.entries(fi.ignored||{}).sort((a,b)=>b[1]-a[1]);
     const r = (k,v)=>`<tr><td>${esc(k)}</td><td class="n">${v}</td></tr>`;
     file = `<div class="card" style="margin-top:14px"><h2>${esc(t("fi.title"))}</h2><table>
+      ${fi.format?r(t("fi.format"), esc(fi.format.replace(" columns", " "+(LANG==="pt-BR"?"colunas":"columns")))):""}
       ${r(t("fi.enc"), esc(fi.encoding))}
       ${r(t("fi.lines"), fN(fi.lines))}
       ${r(t("fi.header"), esc(t(fi.header?"yes":"no")))}
@@ -1134,7 +1139,7 @@ function exportLocal(){
 }
 
 /* ---------- how to export: query and commands ---------- */
-const EXP_COLS = [["ev","col.ev","name"],["ts","col.ts","timestamp_utc"],["duration","","duration"],["cpu","","cpu_time"],
+const EXP_COLS = [["ev","col.ev","name"],["ts","col.ts","timestamp (UTC)"],["duration","","duration"],["cpu","","cpu_time"],
   ["reads","","logical_reads"],["physical","","physical_reads"],["writes","","writes"],["rows","","row_count"],["stmt","","statement"]];
 const EXP_LABEL = {duration:"duration", cpu:"cpu_time", reads:"logical_reads", physical:"physical_reads", writes:"writes", rows:"row_count", stmt:"Statement *"};
 function renderExpCols(){
