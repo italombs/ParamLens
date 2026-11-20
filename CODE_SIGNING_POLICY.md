@@ -6,8 +6,8 @@ Free code signing provided by [SignPath.io](https://signpath.io), certificate by
 
 | Role | Members |
 |---|---|
-| Committers and reviewers | [Italo Mesquita](https://github.com/OWNER) |
-| Approvers | [Italo Mesquita](https://github.com/OWNER) |
+| Committers and reviewers | [Italo Mesquita](https://github.com/italombs) |
+| Approvers | [Italo Mesquita](https://github.com/italombs) |
 
 ## What is signed
 
