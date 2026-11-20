@@ -66,10 +66,10 @@ Bug reports, parser cases from real captures (anonymized!), translations and cod
 [CONTRIBUTING.md](CONTRIBUTING.md). Build and architecture notes are in
 [docs/development.md](docs/development.md); changes per version in [CHANGELOG.md](CHANGELOG.md).
 
-## Code signing
+## Code signing policy
 
-Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
-See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+Team roles, what is signed and the privacy policy: [Code signing policy](CODE_SIGNING_POLICY.md).
 
 ## License
 

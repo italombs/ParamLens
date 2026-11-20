@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- O GitHub Actions envia um .zip contendo ParamLens.exe; a SignPath assina o PE com Authenticode. -->
+<!-- GitHub Actions uploads a .zip containing ParamLens.exe; SignPath signs the PE file with Authenticode. -->
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
   <zip-file>
     <pe-file path="ParamLens.exe" product-name="ParamLens">
