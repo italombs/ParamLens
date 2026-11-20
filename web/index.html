@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ParamLens</title>
+<link rel="icon" href="data:,">
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#fff; --ink:#1c2230; --mute:#646d7e; --line:#e3e6ec; --soft:#eef1f5;
+  --accent:#0f7b74; --accent-soft:#e2f3f1; --bar:#5aa9a2;
+  --hi:#c2410c; --hi-soft:#fdeee6; --mid:#a16207; --mid-soft:#fbf3dc; --info:#3b5bab; --info-soft:#e8edf9;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#12151b;--panel:#1a1e26;--ink:#e6e9ef;--mute:#9aa3b2;--line:#2b313c;--soft:#222833;
+  --accent:#3fb8ae;--accent-soft:#183634;--bar:#3a8f88;--hi:#fb8a5c;--hi-soft:#3a2219;--mid:#e0b452;--mid-soft:#352c16;--info:#8aa6ef;--info-soft:#1f2740;}
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:14px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:14px;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.logo{font-weight:700;letter-spacing:.2px;font-size:16px;display:flex;align-items:center;gap:8px}
+.logo i{width:22px;height:22px;border-radius:6px;background:var(--accent);display:inline-block;position:relative}
+.logo i:after{content:"";position:absolute;inset:6px;border:2px solid var(--panel);border-radius:50%}
+.sub{color:var(--mute);font-size:12.5px}
+.grow{flex:1}
+.btn{border:1px solid var(--line);background:var(--panel);padding:6px 12px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.sm{padding:3px 9px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:default}
+.link{background:none;border:none;color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
+main{padding:18px;max-width:1500px;margin:0 auto}
+.grid2{display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:16px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card h2{font-size:15px;margin:0 0 12px}
+.card h3{font-size:13.5px;margin:18px 0 8px}
+label.f{display:block;margin:0 0 10px}
+label.f span{display:block;font-size:12px;color:var(--mute);margin-bottom:3px}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel)}
+textarea{font-family:var(--mono);font-size:12.5px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.row{display:flex;gap:10px;align-items:center}
+.row > *{flex:1}
+.row > .nf{flex:0 0 auto}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:12px}
+.seg button{border:none;background:none;padding:5px 12px;cursor:pointer;color:var(--mute)}
+.seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.chk{display:flex;gap:7px;align-items:center;margin:6px 0;font-size:13px}
+.ok{color:var(--accent);font-size:12.5px}
+.err{color:var(--hi);font-size:12.5px;white-space:pre-wrap}
+.hint{color:var(--mute);font-size:12px}
+.maps{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.hidden{display:none!important}
+/* resultados */
+.res{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start}
+.side{position:sticky;top:64px;max-height:calc(100vh - 82px);display:flex;flex-direction:column;padding:0;overflow:hidden}
+.side .head{padding:12px 14px;border-bottom:1px solid var(--line)}
+.flist{overflow:auto}
+.fam{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.fam:hover{background:var(--soft)}
+.fam.on{background:var(--accent-soft)}
+.fam .t{font-family:var(--mono);font-size:11.5px;color:var(--ink);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all}
+.fam .m{display:flex;gap:10px;font-size:12px;color:var(--mute);margin-top:5px;align-items:center}
+.share{height:5px;background:var(--soft);border-radius:3px;overflow:hidden;margin-top:6px}
+.share b{display:block;height:100%;background:var(--bar)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.s3{background:var(--hi)}.s2{background:var(--mid)}.s1{background:var(--info)}.s0{background:var(--line)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+.kpi .l{font-size:11.5px;color:var(--mute)}
+.kpi .v{font-size:19px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:11.5px;color:var(--mute)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 14px}
+.tabs button{border:none;background:none;padding:8px 12px;cursor:pointer;color:var(--mute);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--ink);border-color:var(--accent);font-weight:600}
+.find{border:1px solid var(--line);border-left:4px solid var(--info);border-radius:8px;padding:10px 12px;margin-bottom:9px;background:var(--panel)}
+.find.s3{border-left-color:var(--hi);background:linear-gradient(90deg,var(--hi-soft),var(--panel) 40%)}
+.find.s2{border-left-color:var(--mid);background:linear-gradient(90deg,var(--mid-soft),var(--panel) 40%)}
+.find.s1{border-left-color:var(--info)}
+.find .tt{font-weight:600}
+.find .dd{color:var(--mute);font-size:13px;margin-top:3px}
+.find .sg{font-size:13px;margin-top:5px}
+.find .sg:before{content:"Sugestão: ";font-weight:600}
+.find .fm{font-size:12px;margin-top:6px}
+code,.code{font-family:var(--mono);font-size:12px}
+.code{background:var(--soft);border-radius:6px;padding:6px 8px;display:block;margin-top:6px;white-space:pre-wrap;word-break:break-word}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:11.5px;color:var(--mute);font-weight:600;background:var(--soft);position:sticky;top:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.v{font-family:var(--mono);font-size:12px;word-break:break-all;max-width:420px}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--soft)}
+.badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;background:var(--soft);color:var(--mute);white-space:nowrap}
+.badge.c-constante{background:var(--soft)}
+.badge.c-baixa{background:var(--accent-soft);color:var(--accent)}
+.badge.c-alta{background:var(--info-soft);color:var(--info)}
+.badge.ps{background:var(--mid-soft);color:var(--mid)}
+.pbar{display:flex;align-items:center;gap:7px;min-width:130px}
+.pbar .b{flex:1;height:8px;background:var(--soft);border-radius:4px;overflow:hidden;min-width:60px}
+.pbar .b i{display:block;height:100%;background:var(--bar)}
+.pbar .b i.c{background:var(--hi)}
+.pbar span{font-variant-numeric:tabular-nums;font-size:12px;min-width:46px;text-align:right}
+.sub-t td{background:var(--soft)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.chip{border:1px solid var(--line);border-radius:14px;padding:2px 10px;font-size:12px;cursor:pointer;font-family:var(--mono);background:var(--panel)}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.scroll{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:8px}
+pre.sql{font-family:var(--mono);font-size:12px;background:var(--soft);padding:10px;border-radius:8px;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto;margin:0}
+.overlay{position:fixed;inset:0;background:rgba(10,14,20,.45);display:flex;align-items:center;justify-content:center;z-index:20}
+.modal{background:var(--panel);border-radius:12px;padding:18px;width:min(920px,94vw);max-height:90vh;display:flex;flex-direction:column;gap:10px;border:1px solid var(--line)}
+.modal pre{flex:1;overflow:auto;margin:0;max-height:60vh}
+.prog{height:8px;background:var(--soft);border-radius:4px;overflow:hidden}
+.prog i{display:block;height:100%;width:35%;background:var(--accent);animation:mv 1.2s infinite ease-in-out}
+@keyframes mv{0%{margin-left:-35%}100%{margin-left:100%}}
+.empty{color:var(--mute);padding:30px;text-align:center}
+.legend{font-size:12px;color:var(--mute);margin:-4px 0 10px}
+@media (max-width:1050px){.grid2,.res{grid-template-columns:1fr}.side{position:static;max-height:420px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><i></i>ParamLens</div>
+  <div class="sub" id="hdrSub">perfil de parâmetros do rpc_completed</div>
+  <div class="grow"></div>
+  <button class="btn hidden" id="btnNew">Nova análise</button>
+  <button class="btn hidden" id="btnExport">Exportar relatório HTML</button>
+  <button class="btn" id="btnQuit" title="Encerra o ParamLens">Encerrar</button>
+</header>
+
+<main>
+<!-- ================= FONTE ================= -->
+<section id="vSetup" class="grid2">
+  <div class="card">
+    <h2>1. Conexão</h2>
+    <div class="seg" id="segConn"><button data-v="fields" class="on">Campos</button><button data-v="string">Connection string</button></div>
+    <div id="connFields">
+      <label class="f"><span>Servidor (ex.: SRV01, SRV01\INST, 10.0.0.5,1433)</span><input type="text" id="cServer" placeholder="localhost"></label>
+      <label class="f"><span>Autenticação</span>
+        <select id="cAuth"><option value="windows">Windows (usuário atual)</option><option value="sql">SQL Server</option></select></label>
+      <div class="row" id="sqlAuth" style="display:none">
+        <label class="f"><span>Usuário</span><input type="text" id="cUser" autocomplete="off"></label>
+        <label class="f"><span>Senha</span><input type="password" id="cPass" autocomplete="off"></label>
+      </div>
+      <div class="row">
+        <label class="f"><span>Criptografia</span>
+          <select id="cEnc"><option value="false">Opcional (padrão)</option><option value="true">Obrigatória</option><option value="strict">Strict (TDS 8)</option></select></label>
+        <label class="chk nf" style="margin-top:12px"><input type="checkbox" id="cTrust" checked> Confiar no certificado</label>
+      </div>
+    </div>
+    <div id="connString" class="hidden">
+      <label class="f"><span>Connection string (formato ADO)</span>
+        <textarea id="cStr" rows="3" placeholder="server=SRV01;user id=x;password=y;TrustServerCertificate=true"></textarea></label>
+    </div>
+    <div class="row"><button class="btn primary nf" id="btnConnect">Conectar</button><div id="connMsg"></div></div>
+    <p class="hint" style="margin-top:14px">A senha fica só na memória deste processo e não é gravada em disco.</p>
+    <p class="hint">Sem um servidor à mão? <button class="link" id="btnDemo">Carregar dados de exemplo</button></p>
+  </div>
+
+  <div class="card" id="srcCard">
+    <h2>2. Fonte dos eventos</h2>
+    <div class="seg" id="segSrc"><button data-v="table" class="on">Tabela com eventos</button><button data-v="xel">Arquivo .xel</button></div>
+
+    <div id="srcTable">
+      <div class="row">
+        <label class="f"><span>Base de dados</span><select id="sDb" disabled><option>— conecte primeiro —</option></select></label>
+        <label class="f"><span>Tabela</span><select id="sTable" disabled></select></label>
+      </div>
+      <h3>Mapeamento de colunas</h3>
+      <div class="maps">
+        <label class="f"><span>Statement (exec sp_executesql …) *</span><select id="m_stmt"></select></label>
+        <label class="f"><span>Nome do evento</span><select id="m_name"></select></label>
+        <label class="f"><span>duration</span><select id="m_duration"></select></label>
+        <label class="f"><span>cpu_time</span><select id="m_cpu"></select></label>
+        <label class="f"><span>logical_reads</span><select id="m_reads"></select></label>
+        <label class="f"><span>physical_reads</span><select id="m_physical"></select></label>
+        <label class="f"><span>writes</span><select id="m_writes"></select></label>
+        <label class="f"><span>row_count</span><select id="m_rows"></select></label>
+      </div>
+      <div class="row">
+        <label class="f"><span>Unidade de duration/cpu_time</span>
+          <select id="sUnit"><option value="us">microssegundos (padrão do XE)</option><option value="ms">milissegundos</option></select></label>
+        <label class="f"><span>Valor do evento</span><input type="text" id="sEvent" value="rpc_completed"></label>
+      </div>
+    </div>
+
+    <div id="srcXel" class="hidden">
+      <label class="f"><span>Caminho do .xel <b>no servidor</b> (aceita curinga)</span>
+        <input type="text" id="sXel" placeholder="D:\XE\minha_sessao*.xel"></label>
+      <label class="f"><span>Evento</span><input type="text" id="sXelEvent" value="rpc_completed"></label>
+      <p class="hint">Lido pelo próprio SQL Server com sys.fn_xe_file_target_read_file (requer VIEW SERVER STATE). duration/cpu_time em µs.</p>
+    </div>
+
+    <h3>Filtros</h3>
+    <label class="f"><span>Statement LIKE (opcional)</span>
+      <input type="text" id="sLike" placeholder="%MESSAGEIN%MESSAGETYPE%ASSIGNEETYPEID%"></label>
+    <label class="f"><span>WHERE adicional (opcional, T-SQL)</span>
+      <textarea id="sWhere" rows="2" placeholder="[timestamp] >= '2026-11-19'"></textarea></label>
+    <div class="row">
+      <label class="f"><span>Limitar a N linhas (0 = todas)</span><input type="number" id="sTop" value="0" min="0"></label>
+      <label class="chk" style="margin-top:12px"><input type="checkbox" id="sNormLit"> Agrupar queries que só mudam literais</label>
+    </div>
+    <div class="row">
+      <button class="btn primary nf" id="btnAnalyze" disabled>Analisar</button>
+      <button class="btn nf" id="btnPreview" disabled>Ver query</button>
+      <div id="anMsg"></div>
+    </div>
+    <pre class="sql hidden" id="previewQ" style="margin-top:10px"></pre>
+  </div>
+</section>
+
+<!-- ================= RESULTADOS ================= -->
+<section id="vRes" class="hidden">
+  <div class="kpis" id="totKpis"></div>
+  <div class="res">
+    <div class="card side">
+      <div class="head">
+        <div class="row"><b class="nf">Queries</b><span class="hint" id="famCount"></span>
+          <select id="famSort" class="nf" style="width:auto">
+            <option value="cost">por custo</option><option value="execs">por execuções</option><option value="sev">por achados</option></select></div>
+        <input type="text" id="famFilter" placeholder="filtrar por texto…" style="margin-top:8px">
+      </div>
+      <div class="flist" id="famList"></div>
+    </div>
+    <div>
+      <div class="tabs" id="mainTabs"><button data-v="findings" class="on">Todos os achados</button><button data-v="family">Query selecionada</button><button data-v="fails">Não interpretados</button></div>
+      <div id="tFindings"></div>
+      <div id="tFamily" class="hidden"></div>
+      <div id="tFails" class="hidden"></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<div class="overlay hidden" id="progOv">
+  <div class="modal" style="width:min(520px,92vw)">
+    <b>Lendo eventos…</b>
+    <div class="prog"><i></i></div>
+    <div id="progTxt" class="hint"></div>
+    <div class="row"><div></div><button class="btn nf" id="btnCancel">Cancelar</button></div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="sampleOv">
+  <div class="modal">
+    <div class="row"><b class="nf">Execução de exemplo</b><div></div>
+      <div class="seg nf" id="segSample" style="margin:0"><button data-v="script" class="on">Script de teste (DECLARE)</button><button data-v="statement">Statement original</button></div>
+      <button class="btn nf" id="btnCopy">Copiar</button><button class="btn nf" id="btnCloseSample">Fechar</button></div>
+    <pre class="sql" id="sampleTxt"></pre>
+  </div>
+</div>
+
+<!--STATIC-DATA-->
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+const staticEl = document.getElementById("static-data");
+const STATIC = staticEl ? JSON.parse(staticEl.textContent) : null;
+const M = {dur:0,cpu:1,reads:2,phys:3,writes:4,rows:5};
+const MNAME = ["duração","CPU","logical reads","physical reads","writes","linhas"];
+let ov = null, curFam = null, curDetail = null, costM = -1, connOK = false, lastConn = null;
+const detailCache = {};
+
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+const nf0 = new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
+const nf1 = new Intl.NumberFormat("pt-BR",{maximumFractionDigits:1});
+function fN(v){return nf0.format(v)}
+function fP(v){return (v*100>=10||v===0?nf0:nf1).format(v*100)+"%"}
+function fM(m,v){ // métricas: dur/cpu em µs
+  if(m===M.dur||m===M.cpu){const ms=v/1000; return ms>=1000? nf1.format(ms/1000)+" s" : nf1.format(ms)+" ms"}
+  return v>=100? nf0.format(v) : nf1.format(v)
+}
+function avg(a,m){return a.count? a.sum[m]/a.count : 0}
+
+async function api(path, body){
+  const opt = {headers:{"X-Token":TOKEN}};
+  if(body!==undefined){opt.method="POST";opt.body=JSON.stringify(body);opt.headers["Content-Type"]="application/json"}
+  const r = await fetch(path, opt);
+  const txt = await r.text();
+  let j; try{ j = JSON.parse(txt) }catch(e){ throw new Error(txt||("HTTP "+r.status)) }
+  if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
+  return j;
+}
+
+/* ---------- segmentos ---------- */
+function seg(id, cb){
+  const el = $(id);
+  el.addEventListener("click", e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    el.querySelectorAll("button").forEach(x=>x.classList.toggle("on", x===b));
+    cb(b.dataset.v);
+  });
+}
+const segVal = id => $(id+" button.on").dataset.v;
+seg("#segConn", v=>{ $("#connFields").classList.toggle("hidden", v!=="fields"); $("#connString").classList.toggle("hidden", v!=="string") });
+seg("#segSrc", v=>{ $("#srcTable").classList.toggle("hidden", v!=="table"); $("#srcXel").classList.toggle("hidden", v!=="xel"); updateAnalyzeBtn() });
+$("#cAuth").addEventListener("change", e=> $("#sqlAuth").style.display = e.target.value==="sql"?"flex":"none");
+
+function connReq(){
+  return {mode:segVal("#segConn"), server:$("#cServer").value, auth:$("#cAuth").value, user:$("#cUser").value,
+    password:$("#cPass").value, encrypt:$("#cEnc").value, trust:$("#cTrust").checked, connString:$("#cStr").value};
+}
+
+/* ---------- conexão ---------- */
+$("#btnConnect").onclick = async ()=>{
+  const msg = $("#connMsg"); msg.className="hint"; msg.textContent="conectando…";
+  $("#btnConnect").disabled = true;
+  try{
+    const c = connReq();
+    const si = await api("/api/test", c);
+    lastConn = c; connOK = true;
+    msg.className="ok"; msg.textContent = "✓ "+(si.server||"")+" · "+si.version+" · "+si.login;
+    const db = $("#sDb"); db.disabled=false;
+    db.innerHTML = si.databases.map(d=>`<option ${d===si.current?"selected":""}>${esc(d)}</option>`).join("");
+    await loadTables();
+  }catch(e){ connOK=false; msg.className="err"; msg.textContent=e.message }
+  $("#btnConnect").disabled = false;
+  updateAnalyzeBtn();
+};
+$("#sDb").addEventListener("change", loadTables);
+let tables = [];
+async function loadTables(){
+  const sel = $("#sTable"); sel.disabled = true; sel.innerHTML = "<option>carregando…</option>";
+  try{
+    tables = await api("/api/tables", {conn:lastConn, db:$("#sDb").value});
+    sel.innerHTML = tables.length ? tables.map((t,i)=>`<option value="${i}">${t.likely?"★ ":""}${esc(t.schema+"."+t.name)} (${fN(t.rows)} linhas)</option>`).join("") : "<option value=''>— nenhuma tabela —</option>";
+    sel.disabled = !tables.length;
+    if(tables.length) await loadColumns();
+  }catch(e){ sel.innerHTML=""; $("#anMsg").className="err"; $("#anMsg").textContent=e.message }
+}
+$("#sTable").addEventListener("change", loadColumns);
+const MAPS = {stmt:["statement","batch_text","sql_text"], name:["name","event_name","event"], duration:["duration"], cpu:["cpu_time","cpu"],
+  reads:["logical_reads","reads"], physical:["physical_reads"], writes:["writes"], rows:["row_count","rows"]};
+async function loadColumns(){
+  const t = tables[+$("#sTable").value]; if(!t) return;
+  try{
+    const cols = await api("/api/columns", {conn:lastConn, db:$("#sDb").value, schema:t.schema, table:t.name});
+    for(const k in MAPS){
+      const sel = $("#m_"+k);
+      const names = cols.map(c=>c.name);
+      let pick = "";
+      for(const cand of MAPS[k]){ const f = names.find(n=>n.toLowerCase()===cand); if(f){pick=f;break} }
+      sel.innerHTML = (k==="stmt"?"":"<option value=''>(nenhuma)</option>") + cols.map(c=>`<option ${c.name===pick?"selected":""} value="${esc(c.name)}">${esc(c.name)} · ${esc(c.type)}</option>`).join("");
+    }
+  }catch(e){ $("#anMsg").className="err"; $("#anMsg").textContent=e.message }
+  updateAnalyzeBtn();
+}
+function updateAnalyzeBtn(){
+  const src = segVal("#segSrc");
+  const ok = connOK && (src==="xel" || (tables.length && $("#m_stmt").value));
+  $("#btnAnalyze").disabled = !ok; $("#btnPreview").disabled = !ok;
+}
+function sourceReq(){
+  const src = segVal("#segSrc");
+  const t = tables[+$("#sTable").value] || {};
+  const cols = {}; for(const k in MAPS){ const v=$("#m_"+k).value; if(v) cols[k]=v }
+  return {
+    conn:lastConn, normalizeLiterals:$("#sNormLit").checked, unitMs: src==="table" && $("#sUnit").value==="ms",
+    source:{type:src, db:$("#sDb").value, schema:t.schema, table:t.name, cols,
+      eventValue: src==="xel"? $("#sXelEvent").value : $("#sEvent").value,
+      like:$("#sLike").value, where:$("#sWhere").value, top:+$("#sTop").value||0, xelPath:$("#sXel").value}
+  };
+}
+$("#btnPreview").onclick = async ()=>{
+  try{ const r = await api("/api/preview", sourceReq()); const p=$("#previewQ"); p.textContent=r.query; p.classList.remove("hidden") }
+  catch(e){ $("#anMsg").className="err"; $("#anMsg").textContent=e.message }
+};
+$("#btnAnalyze").onclick = ()=> startAnalyze(sourceReq());
+$("#btnDemo").onclick = ()=> startAnalyze({conn:{}, source:{type:"demo", demoRows:25000}});
+
+async function startAnalyze(req){
+  $("#anMsg").textContent="";
+  try{ await api("/api/analyze", req) }catch(e){ $("#anMsg").className="err"; $("#anMsg").textContent=e.message; return }
+  $("#progOv").classList.remove("hidden");
+  poll();
+}
+async function poll(){
+  let st;
+  try{ st = await api("/api/status") }catch(e){ $("#progTxt").textContent=e.message; setTimeout(poll,1000); return }
+  $("#progTxt").innerHTML = `${fN(st.read)} linhas lidas · ${fN(st.parsed)} interpretadas · ${fN(st.failed)} com falha · ${nf1.format(st.elapsedMs/1000)} s`;
+  if(st.state==="running"){ setTimeout(poll, 500); return }
+  $("#progOv").classList.add("hidden");
+  if(st.state==="error"){ $("#anMsg").className="err"; $("#anMsg").textContent="Erro: "+st.error; if(!st.parsed) return }
+  await loadResults();
+}
+$("#btnCancel").onclick = ()=> api("/api/cancel", {});
+
+/* ---------- resultados ---------- */
+async function loadResults(){
+  let r;
+  if(STATIC){ r = STATIC } else { r = await api("/api/overview") }
+  ov = r.overview; costM = ov.costMetric;
+  for(const k in detailCache) delete detailCache[k];
+  $("#hdrSub").textContent = (r.label||"") + (r.generated? " · gerado em "+r.generated : "") + (r.state==="canceled"?" · (cancelado — dados parciais)":"");
+  $("#vSetup").classList.add("hidden"); $("#vRes").classList.remove("hidden");
+  if(!STATIC){ $("#btnNew").classList.remove("hidden"); $("#btnExport").classList.remove("hidden") }
+  renderTotals(); renderFamList(); renderAllFindings(); renderFails();
+  showTab("findings");
+  if(ov.families.length) selectFamily(ov.families[0].id, false);
+}
+function renderTotals(){
+  const t = ov.totals, h = ov.has;
+  const k = [];
+  k.push(kpi("Execuções", fN(t.count), `${fN(ov.families.length)} queries distintas`));
+  if(h[M.dur]) k.push(kpi("Duração total", fM(M.dur,t.sum[M.dur]), "média "+fM(M.dur,avg(t,M.dur))));
+  if(h[M.cpu]) k.push(kpi("CPU total", fM(M.cpu,t.sum[M.cpu]), "média "+fM(M.cpu,avg(t,M.cpu))));
+  if(h[M.reads]) k.push(kpi("Logical reads", fN(t.sum[M.reads]), "média "+fM(M.reads,avg(t,M.reads))));
+  k.push(kpi("Não interpretados", fN(ov.failed), ov.read? fP(ov.failed/ov.read)+" das linhas":""));
+  const sev3 = ov.findings.filter(f=>f.sev===3).length;
+  k.push(kpi("Achados", fN(ov.findings.length), `${sev3} de alta prioridade`));
+  $("#totKpis").innerHTML = k.join("");
+}
+function kpi(l,v,d){return `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div><div class="d">${esc(d||"")}</div></div>`}
+
+function famCost(f){ return costM>=0 ? f.share[costM] : f.execShare }
+function renderFamList(){
+  const q = $("#famFilter").value.toLowerCase();
+  let fs = ov.families.filter(f=>!q || f.title.toLowerCase().includes(q) || (f.proc||"").toLowerCase().includes(q));
+  const s = $("#famSort").value;
+  fs = fs.slice().sort((a,b)=> s==="execs"? b.agg.count-a.agg.count : s==="sev"? (b.maxSev-a.maxSev)||(b.findings-a.findings) : famCost(b)-famCost(a));
+  $("#famCount").textContent = fs.length+" de "+ov.families.length;
+  const cl = costM>=0? MNAME[costM] : "execuções";
+  $("#famList").innerHTML = fs.map(f=>`
+    <div class="fam ${curFam===f.id?"on":""}" data-id="${f.id}">
+      <div class="t">${esc(f.title)}</div>
+      <div class="m"><span class="dot s${f.maxSev}"></span><span>${fN(f.agg.count)} exec · ${fP(f.execShare)}</span><span>${fP(famCost(f))} ${cl}</span><span>${f.findings} achado(s)</span></div>
+      <div class="share"><b style="width:${(famCost(f)*100).toFixed(1)}%"></b></div>
+    </div>`).join("") || `<div class="empty">nada encontrado</div>`;
+}
+$("#famFilter").addEventListener("input", renderFamList);
+$("#famSort").addEventListener("change", renderFamList);
+$("#famList").addEventListener("click", e=>{ const d=e.target.closest(".fam"); if(d) selectFamily(+d.dataset.id, true) });
+
+function showTab(v){
+  $$("#mainTabs button").forEach(b=>b.classList.toggle("on", b.dataset.v===v));
+  $("#tFindings").classList.toggle("hidden", v!=="findings");
+  $("#tFamily").classList.toggle("hidden", v!=="family");
+  $("#tFails").classList.toggle("hidden", v!=="fails");
+}
+$("#mainTabs").addEventListener("click", e=>{ const b=e.target.closest("button"); if(b) showTab(b.dataset.v) });
+
+function findingHTML(f, withFam){
+  const fam = withFam ? ov.families.find(x=>x.id===f.family) : null;
+  return `<div class="find s${f.sev}">
+    <div class="tt">${esc(f.title)}</div>
+    ${f.detail?`<div class="dd">${esc(f.detail)}</div>`:""}
+    ${f.code?`<code class="code">${esc(f.code)}</code>`:""}
+    ${f.suggestion?`<div class="sg">${esc(f.suggestion)}</div>`:""}
+    ${fam?`<div class="fm"><button class="link" data-fam="${fam.id}">${esc(fam.title.slice(0,110))}</button> · ${fN(fam.agg.count)} exec · ${fP(famCost(fam))} do ${costM>=0?MNAME[costM]:"total"}</div>`:""}
+  </div>`;
+}
+function renderAllFindings(){
+  const el = $("#tFindings");
+  if(!ov.findings.length){ el.innerHTML = `<div class="card empty">Nenhum achado. Veja os detalhes de cada query na lista ao lado.</div>`; return }
+  el.innerHTML = `<p class="legend"><span class="dot s3"></span> alta &nbsp; <span class="dot s2"></span> média &nbsp; <span class="dot s1"></span> informativo — ordenado por prioridade e peso da query</p>` + ov.findings.map(f=>findingHTML(f,true)).join("");
+}
+$("#tFindings").addEventListener("click", e=>{ const b=e.target.closest("[data-fam]"); if(b) selectFamily(+b.dataset.fam, true) });
+
+function renderFails(){
+  const el = $("#tFails");
+  const kinds = Object.entries(ov.failKinds||{}).sort((a,b)=>b[1]-a[1]);
+  if(!ov.failed){ el.innerHTML = `<div class="card empty">Todas as linhas foram interpretadas.</div>`; return }
+  el.innerHTML = `<div class="card"><h2>${fN(ov.failed)} linha(s) não interpretada(s)</h2>
+    <table><tr><th>Motivo</th><th class="n">Linhas</th></tr>${kinds.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fN(v)}</td></tr>`).join("")}</table>
+    <h3>Exemplos</h3>${(ov.fails||[]).map(f=>`<div class="find s1"><div class="tt">${esc(f.error)}</div><code class="code">${esc(f.stmt)}</code></div>`).join("")}</div>`;
+}
+
+async function getDetail(id){
+  if(detailCache[id]) return detailCache[id];
+  const d = STATIC ? STATIC.details[id] : await api("/api/family?id="+id);
+  detailCache[id] = d; return d;
+}
+async function selectFamily(id, switchTab){
+  curFam = id; renderFamList();
+  if(switchTab) showTab("family");
+  const el = $("#tFamily");
+  el.innerHTML = `<div class="empty">carregando…</div>`;
+  try{ curDetail = await getDetail(id) }catch(e){ el.innerHTML = `<div class="err">${esc(e.message)}</div>`; return }
+  renderFamily();
+}
+
+function pbar(p, cost){ return `<div class="pbar"><div class="b"><i class="${cost?"c":""}" style="width:${Math.min(100,p*100).toFixed(1)}%"></i></div><span>${fP(p)}</span></div>` }
+
+function renderFamily(){
+  const d = curDetail, s = d.summary, a = s.agg, h = ov.has;
+  const k = [kpi("Execuções", fN(a.count), fP(s.execShare)+" do total")];
+  for(const m of [M.dur,M.cpu,M.reads]) if(h[m]) k.push(kpi(MNAME[m]+" média", fM(m,avg(a,m)), fP(s.share[m])+" do total · máx "+fM(m,a.max[m])));
+  if(h[M.rows]) k.push(kpi("linhas média", fM(M.rows,avg(a,M.rows)), ""));
+  const cm = costM;
+  let html = `<div class="card" style="margin-bottom:14px">
+    <div class="row"><h2 class="nf" style="margin:0">${s.kind==="proc"?"Procedure "+esc(s.proc):"Query via "+esc(s.kind)}</h2><div></div>
+      ${!STATIC?`<button class="btn sm nf" data-sample="${a.sample}">Exemplo</button>`:""}</div>
+    <div class="kpis" style="margin-top:12px">${k.join("")}</div>
+    <details><summary class="hint" style="cursor:pointer">SQL de exemplo${d.decls&&d.decls.length?` · ${d.decls.length} declaração(ões) de parâmetros`:""}</summary>
+      <pre class="sql" style="margin-top:8px">${esc(d.sql||d.norm)}</pre>
+      ${d.decls&&d.decls.length?`<h3>Declarações de parâmetros</h3><table><tr><th>Declaração</th><th class="n">Execuções</th></tr>${d.decls.slice(0,10).map(x=>`<tr><td class="v">${esc(x.k)}</td><td class="n">${fN(x.v)}</td></tr>`).join("")}</table>`:""}
+    </details></div>`;
+
+  if(d.findings && d.findings.length) html += `<div class="card" style="margin-bottom:14px"><h2>Achados</h2>${d.findings.map(f=>findingHTML(f,false)).join("")}</div>`;
+
+  if(d.patterns && d.patterns.length){
+    html += `<div class="card" style="margin-bottom:14px"><h2>Predicados catch-all (OR / ISNULL)</h2>
+    <p class="legend">% de execuções em que a condição do lado do parâmetro é verdadeira — quando verdadeira, o outro lado do OR não filtra nada.</p>
+    <div class="scroll"><table><tr><th>Condição</th><th>Verdadeira em</th>${cm>=0?`<th class="n">${MNAME[cm]} méd. (V)</th><th class="n">${MNAME[cm]} méd. (F)</th>`:""}<th>Trecho</th></tr>
+    ${d.patterns.map(p=>`<tr><td class="v">${esc(p.cond)}</td><td>${pbar(p.truePct)}<span class="hint">${fN(p.true.count)} de ${fN(p.evaluated)}</span></td>
+      ${cm>=0?`<td class="n">${p.true.count?fM(cm,avg(p.true,cm)):"–"}</td><td class="n">${p.false.count?fM(cm,avg(p.false,cm)):"–"}</td>`:""}
+      <td class="v" style="max-width:520px">${esc(p.snippet)}</td></tr>`).join("")}</table></div></div>`;
+  }
+
+  if(d.shapes && d.shapes.params && d.shapes.params.length){
+    const sh = d.shapes;
+    html += `<div class="card" style="margin-bottom:14px"><h2>Formatos de chamada</h2>
+    <p class="legend">Cada linha é uma combinação de catch-alls: <span class="badge c-alta">filtra</span> = o filtro foi aplicado; <span class="badge">pass-through</span> = a condição do parâmetro era verdadeira e o OR não filtrou nada.</p>
+    <div class="scroll"><table><tr>${sh.params.map(p=>`<th><code>${esc(p)}</code></th>`).join("")}<th class="n">Execuções</th><th>% execuções</th>${cm>=0?`<th>% custo</th><th class="n">${MNAME[cm]} méd.</th>`:""}<th></th></tr>
+    ${sh.rows.map(r=>`<tr>${r.values.map(v=>`<td><span class="badge ${v==="filtra"?"c-alta":""}">${esc(v)}</span></td>`).join("")}
+      <td class="n">${fN(r.agg.count)}</td><td>${pbar(r.pct)}</td>${cm>=0?`<td>${pbar(r.share[cm],true)}</td><td class="n">${fM(cm,avg(r.agg,cm))}</td>`:""}
+      <td>${!STATIC?`<button class="btn sm" data-sample="${r.agg.sample}">exemplo</button>`:""}</td></tr>`).join("")}</table></div></div>`;
+  }
+
+  // parâmetros
+  html += `<div class="card" style="margin-bottom:14px"><h2>Parâmetros</h2>
+  <p class="legend">Clique numa linha para ver a distribuição de valores.${cm>=0?` "Custo" = participação no ${MNAME[cm]} desta query.`:""}</p>
+  <div class="scroll"><table id="ptab"><tr><th>Parâmetro</th><th>Tipo</th><th>Cardinalidade</th><th class="n">Distintos</th><th>Valor mais comum</th><th>% execuções</th><th class="n">% NULL</th></tr>
+  ${d.params.map((p,i)=>{
+    const t = p.top[0]||{value:"",pct:0};
+    return `<tr class="click" data-p="${i}"><td class="v">${esc(p.name)} ${p.pseudo?`<span class="badge ps">${p.pseudo==="in-values"?"lista IN":"tam. IN"}</span>`:""}</td>
+      <td class="v">${esc(p.type)}${p.types&&p.types.length>1?` <span class="badge" title="${esc(p.types.map(x=>x.k+": "+x.v).join("\n"))}">+${p.types.length-1} tipos</span>`:""}</td>
+      <td><span class="badge c-${p.card}">${p.card}</span></td><td class="n">${fN(p.distinct)}${p.overflow?"+":""}</td>
+      <td class="v">${esc(t.value)}</td><td>${pbar(t.pct)}</td><td class="n">${p.nullPct?fP(p.nullPct):"–"}</td></tr>
+      <tr class="sub-t hidden" id="pd${i}"><td colspan="7"></td></tr>`}).join("")}
+  </table></div></div>`;
+
+  // combinações
+  html += `<div class="card"><h2>Combinações de valores</h2>
+    <p class="legend">Escolha os parâmetros que formam a combinação. Parâmetros de alta cardinalidade entram por <b>classe</b> (NULL, 0, '', data nula, (valor)…).${STATIC?" No relatório exportado a seleção é fixa.":""}</p>
+    <div class="chips" id="chips">${d.params.filter(p=>p.card!=="constante").map(p=>`<span class="chip ${d.combos.indexes.includes(p.index)?"on":""}" data-i="${p.index}">${esc(p.name)}</span>`).join("")}</div>
+    <div id="comboTab"></div></div>`;
+
+  $("#tFamily").innerHTML = html;
+  renderCombos(d.combos);
+}
+
+function valueRows(list, a){
+  const cm = costM;
+  return list.map(v=>`<tr><td class="v">${esc(v.value)}</td><td class="n">${fN(v.agg.count)}</td><td>${pbar(v.pct)}</td>
+    ${cm>=0?`<td>${pbar(v.share[cm],true)}</td><td class="n">${fM(cm,avg(v.agg,cm))}</td>`:""}
+    ${!STATIC?`<td><button class="btn sm" data-sample="${v.agg.sample}">exemplo</button></td>`:"<td></td>"}</tr>`).join("");
+}
+function valueTable(p){
+  const cm = costM;
+  const head = `<tr><th>Valor</th><th class="n">Execuções</th><th>% execuções</th>${cm>=0?`<th>% custo</th><th class="n">${MNAME[cm]} méd.</th>`:""}<th></th></tr>`;
+  let h = "";
+  if(p.classes && p.classes.length) h += `<h3 style="margin-top:4px">Por classe</h3><table>${head}${valueRows(p.classes)}</table><h3>Valores mais frequentes</h3>`;
+  h += `<table>${head}${valueRows(p.top)}${p.others?`<tr><td class="hint">(demais valores)</td><td class="n">${fN(p.others)}</td><td colspan="4"></td></tr>`:""}</table>`;
+  return h;
+}
+$("#tFamily").addEventListener("click", async e=>{
+  const s = e.target.closest("[data-sample]");
+  if(s){ e.stopPropagation(); openSample(+s.dataset.sample); return }
+  const tr = e.target.closest("tr[data-p]");
+  if(tr){
+    const i = +tr.dataset.p, sub = $("#pd"+i);
+    if(sub.classList.toggle("hidden")) return;
+    sub.firstElementChild.innerHTML = valueTable(curDetail.params[i]);
+    return;
+  }
+  const c = e.target.closest(".chip");
+  if(c && !STATIC){
+    c.classList.toggle("on");
+    const idx = $$("#chips .chip.on").map(x=>+x.dataset.i);
+    $("#comboTab").innerHTML = `<div class="empty">calculando…</div>`;
+    try{ renderCombos(await api("/api/combos", {id:curFam, indexes:idx})) }catch(err){ $("#comboTab").innerHTML=`<div class="err">${esc(err.message)}</div>` }
+  }
+});
+let lastCombo = null;
+function renderCombos(c){
+  lastCombo = c;
+  const cm = costM, el = $("#comboTab");
+  if(!c.params || !c.params.length){ el.innerHTML = `<div class="empty">Selecione ao menos um parâmetro.</div>`; return }
+  el.innerHTML = `<div class="row" style="margin-bottom:8px"><span class="hint">${fN(c.distinct)} combinação(ões) distinta(s)${c.rows.length<c.distinct?` · mostrando as ${c.rows.length} mais frequentes`:""}</span>
+      <button class="btn sm nf" id="btnCsv">Exportar CSV</button></div>
+    <div class="scroll"><table><tr>${c.params.map((p,i)=>`<th>${esc(p)}${c.modes[i]==="classe"?' <span class="badge c-alta">classe</span>':""}</th>`).join("")}
+    <th class="n">Execuções</th><th>% execuções</th>${cm>=0?`<th>% custo</th><th class="n">${MNAME[cm]} méd.</th>`:""}<th></th></tr>
+    ${c.rows.map(r=>`<tr>${r.values.map(v=>`<td class="v">${esc(v)}</td>`).join("")}<td class="n">${fN(r.agg.count)}</td><td>${pbar(r.pct)}</td>
+      ${cm>=0?`<td>${pbar(r.share[cm],true)}</td><td class="n">${fM(cm,avg(r.agg,cm))}</td>`:""}
+      <td>${!STATIC?`<button class="btn sm" data-sample="${r.agg.sample}">exemplo</button>`:""}</td></tr>`).join("")}</table></div>`;
+  $("#btnCsv").onclick = ()=>{
+    const q = v => '"'+String(v).replace(/"/g,'""')+'"';
+    const hdr = [...c.params, "execucoes","pct_execucoes", ...(cm>=0?["pct_custo","custo_medio"]:[])];
+    const lines = [hdr.map(q).join(";")].concat(c.rows.map(r=>[...r.values, r.agg.count, (r.pct*100).toFixed(2), ...(cm>=0?[(r.share[cm]*100).toFixed(2), avg(r.agg,cm).toFixed(1)]:[])].map(q).join(";")));
+    download("combinacoes.csv", "\ufeff"+lines.join("\r\n"), "text/csv");
+  };
+}
+function download(name, text, type){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text],{type})); a.download = name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+
+/* ---------- exemplo ---------- */
+let sampleData = null;
+async function openSample(ix){
+  $("#sampleTxt").textContent = "carregando…"; $("#sampleOv").classList.remove("hidden");
+  try{ sampleData = await api("/api/sample?exec="+ix); showSample() }catch(e){ $("#sampleTxt").textContent = e.message }
+}
+function showSample(){ $("#sampleTxt").textContent = sampleData ? sampleData[segVal("#segSample")] : "" }
+seg("#segSample", showSample);
+$("#btnCloseSample").onclick = ()=> $("#sampleOv").classList.add("hidden");
+$("#sampleOv").addEventListener("click", e=>{ if(e.target.id==="sampleOv") $("#sampleOv").classList.add("hidden") });
+$("#btnCopy").onclick = async ()=>{
+  const t = $("#sampleTxt").textContent;
+  try{ await navigator.clipboard.writeText(t) }catch(e){ const r=document.createRange(); r.selectNodeContents($("#sampleTxt")); getSelection().removeAllRanges(); getSelection().addRange(r); document.execCommand("copy") }
+  $("#btnCopy").textContent="Copiado ✓"; setTimeout(()=>$("#btnCopy").textContent="Copiar",1200);
+};
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") $("#sampleOv").classList.add("hidden") });
+
+/* ---------- topo ---------- */
+$("#btnNew").onclick = ()=>{ $("#vRes").classList.add("hidden"); $("#vSetup").classList.remove("hidden"); $("#btnNew").classList.add("hidden"); $("#btnExport").classList.add("hidden"); $("#hdrSub").textContent="perfil de parâmetros do rpc_completed" };
+$("#btnExport").onclick = ()=>{ location.href = "/api/export?t="+encodeURIComponent(TOKEN) };
+$("#btnQuit").onclick = async ()=>{
+  if(!confirm("Encerrar o ParamLens?")) return;
+  try{ await api("/api/quit", {}) }catch(e){}
+  document.body.innerHTML = `<div class="empty" style="padding:80px">ParamLens encerrado. Pode fechar esta aba.</div>`;
+};
+
+/* ---------- início ---------- */
+if(STATIC){
+  $("#btnQuit").classList.add("hidden");
+  loadResults();
+}else{
+  api("/api/status").then(st=>{ if(st.state==="done"||st.state==="canceled") loadResults(); else if(st.state==="running"){ $("#progOv").classList.remove("hidden"); poll() } }).catch(()=>{});
+}
+</script>
+</body>
+</html>

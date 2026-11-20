@@ -1,0 +1,93 @@
+name: Release
+
+# Disparado por uma tag de versão: git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Versão a partir da tag
+        id: ver
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "file_version=$v.0" >> "$GITHUB_OUTPUT"
+
+      - name: Dependências
+        run: go mod tidy
+
+      - name: Testes
+        run: go test ./...
+
+      - name: Metadados do executável (nome, versão, copyright)
+        shell: bash
+        run: |
+          go install github.com/tc-hib/go-winres@v0.3.3
+          go-winres simply --arch amd64 --manifest cli \
+            --product-name "ParamLens" \
+            --file-description "ParamLens - perfil de parametros do rpc_completed (SQL Server Extended Events)" \
+            --product-version "${{ steps.ver.outputs.file_version }}" \
+            --file-version "${{ steps.ver.outputs.file_version }}" \
+            --copyright "Copyright (c) 2026 Italo Mesquita - MIT License" \
+            --original-filename "ParamLens.exe"
+
+      - name: Build
+        shell: bash
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w -X main.version=${{ steps.ver.outputs.version }}" -o dist/ParamLens.exe .
+
+      - name: Upload do executável sem assinatura
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: ParamLens-unsigned
+          path: dist/ParamLens.exe
+          if-no-files-found: error
+
+      # Só roda depois que o projeto for aprovado na SignPath Foundation
+      # (secret SIGNPATH_API_TOKEN e variável SIGNPATH_ORGANIZATION_ID configurados).
+      - name: Assinar com SignPath
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug: 'ParamLens'
+          signing-policy-slug: 'release-signing'
+          artifact-configuration-slug: 'default'
+          github-artifact-id: '${{ steps.upload-unsigned.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: 'signed'
+
+      - name: Escolher binário (assinado se disponível)
+        shell: bash
+        run: |
+          if [ -f signed/ParamLens.exe ]; then cp signed/ParamLens.exe dist/ParamLens.exe; echo "Usando binário assinado"; fi
+          cd dist && sha256sum ParamLens.exe > ParamLens.exe.sha256 && cat ParamLens.exe.sha256
+
+      - name: Publicar release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/ParamLens.exe
+            dist/ParamLens.exe.sha256
+          generate_release_notes: true
