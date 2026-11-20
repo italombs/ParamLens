@@ -78,7 +78,8 @@ matched by name, RFC 4180 quoting, separator detected; `detectFormat`/`forEachRe
   named instance, encrypt), table/column listing, table source query, `.xel` query.
 - The generated export queries/bcp command were not yet run on the real server.
 - On the company PC the unsigned `.exe` is blocked by SmartScreen **without** a "Run anyway" option.
-- Next: apply at https://signpath.org/apply (the signing step runs only when the variable
+- SignPath Foundation application submitted on 2026-11-20 (maintainer type: individual); waiting for the answer.
+  When approved: create the variable `SIGNPATH_ORGANIZATION_ID` and the secret `SIGNPATH_API_TOKEN` (the signing step runs only when the variable
   `SIGNPATH_ORGANIZATION_ID` and the secret `SIGNPATH_API_TOKEN` exist).
 
 ## Ideas
