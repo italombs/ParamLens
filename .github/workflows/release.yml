@@ -101,4 +101,4 @@ jobs:
             dist/ParamLens.html.sha256
           generate_release_notes: true
           body: |
-            [Code signing policy](https://github.com/italombs/paramLens/blob/main/CODE_SIGNING_POLICY.md): free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+            [Code signing policy](https://github.com/italombs/ParamLens/blob/main/CODE_SIGNING_POLICY.md): free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
