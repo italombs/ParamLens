@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -48,5 +49,22 @@ func TestEqual(t *testing.T) {
 	}
 	for _, c := range cases {
 		if got, _ := sqlEqual(c.a, c.b); got != c.want { t.Errorf("%s = %s -> %v", c.a, c.b, got) }
+	}
+}
+
+// O motor JS vai inline no index.html: não pode fechar o <script> nem abrir comentário HTML,
+// e os marcadores precisam existir exatamente uma vez.
+func TestAssembledHTML(t *testing.T) {
+	if bytes.Contains(bytes.ToLower(engineJS), []byte("</script")) || bytes.Contains(engineJS, []byte("<!--")) {
+		t.Fatal("web/engine.js contém </script ou <!--")
+	}
+	if n := bytes.Count(indexSrc, []byte("<!--ENGINE-->")); n != 1 {
+		t.Fatalf("marcador <!--ENGINE--> aparece %d vezes", n)
+	}
+	if n := bytes.Count(indexSrc, []byte("<!--STATIC-DATA-->")); n != 1 {
+		t.Fatalf("marcador <!--STATIC-DATA--> aparece %d vezes", n)
+	}
+	if !bytes.Contains(indexHTML, []byte(`<script id="pl-engine">`)) || bytes.Contains(indexHTML, []byte("<!--ENGINE-->")) {
+		t.Fatal("motor JS não foi injetado")
 	}
 }

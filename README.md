@@ -1,88 +1,112 @@
 # ParamLens
 
-**Perfil de parâmetros de eventos `rpc_completed` do SQL Server Extended Events.**
-*Parameter profiling for SQL Server Extended Events `rpc_completed` captures.*
+**Parameter profiling for SQL Server Extended Events `rpc_completed` captures.**
 
-Você aponta para uma tabela com eventos `rpc_completed` (ou para um `.xel` no servidor) e o ParamLens
-interpreta cada `exec sp_executesql …`, extrai os parâmetros e mostra como a aplicação realmente chama
-cada query: distribuição de valores, combinações, custo por padrão de chamada e predicados *catch-all*
-(`@p = 0 OR col = @p`) que viram *pass-through* na maioria das execuções.
+Point ParamLens at a table of `rpc_completed` events (or at a `.xel` file on the server, or at an
+exported file) and it parses every `exec sp_executesql …`, extracts the parameters and shows how the
+application really calls each query: value distributions, combinations, cost per call pattern and
+*catch-all* predicates (`@p = 0 OR col = @p`) that turn into a *pass-through* in most executions.
 
-Feito para os problemas típicos de ORMs/low-code (OutSystems, Entity Framework, etc.): ORs opcionais,
-parameter sniffing, listas `IN` inline e variação de tipos/tamanhos de parâmetros.
+Built for the usual ORM/low-code problems (OutSystems, Entity Framework, etc.): optional ORs,
+parameter sniffing, inline `IN` lists and parameter type/size variations.
+
+The interface is in English by default and can be switched to Portuguese (pt-BR) from the header.
 
 ## Download
 
-Baixe o `ParamLens.exe` em [Releases](../../releases). Um único executável, sem instalação.
-Ao abrir, ele inicia uma interface local em `http://127.0.0.1:<porta>` e abre o navegador.
+From [Releases](../../releases):
 
-## O que ele mostra
+- **`ParamLens.exe`**: a single executable, no installation. It starts a local interface on
+  `http://127.0.0.1:<port>`, opens the browser and connects to SQL Server.
+- **`ParamLens.html`**: standalone HTML version, for when the `.exe` cannot run. It opens offline in any
+  browser: you export the events to a file (bcp or SSMS) and drop the file onto the page. The analysis
+  runs in the browser itself and nothing leaves the machine. The page builds the export query and
+  command for you; the file format is described in [docs/export-format.md](docs/export-format.md).
 
-- **Predicados catch-all** detectados no SQL (`@x = 0 OR …`, `@d = @nullDate OR …`, `ISNULL(@p, …)`) e o
-  % de execuções em que cada um é verdadeiro, com custo médio nos dois casos.
-- **Formatos de chamada:** quais filtros estavam ativos juntos, com % de execuções e % do custo.
-- **Parâmetros:** tipo, cardinalidade, valores mais frequentes, % NULL, classes (NULL, 0, '', data nula…).
-- **Combinações** de valores escolhidas por você, exportáveis em CSV.
-- **Listas IN inline** como pseudo-parâmetros (valores e tamanho) e o número de textos SQL distintos gerados.
-- **Achados:** valores dominantes com custo desigual (parameter sniffing), declarações de parâmetros
-  divergentes, parâmetros constantes, combinações desproporcionalmente caras.
-- **Script de teste:** `DECLARE` + SQL de uma execução real, pronto para o SSMS.
-- **Relatório HTML** exportável, que abre offline.
+## What it shows
 
-## Fontes suportadas
+- **Catch-all predicates** detected in the SQL (`@x = 0 OR …`, `@d = @nullDate OR …`, `ISNULL(@p, …)`) and
+  the % of executions in which each one is true, with the average cost in both cases.
+- **Call shapes:** which filters were active together, with % of executions and % of cost.
+- **Parameters:** type, cardinality, most frequent values, % NULL, classes (NULL, 0, '', null date…).
+- **Combinations** of values of your choice, exportable as CSV.
+- **Inline IN lists** as pseudo-parameters (values and size) and the number of distinct SQL texts they create.
+- **Findings:** dominant values with unequal cost (parameter sniffing), diverging parameter
+  declarations, constant parameters, disproportionately expensive combinations.
+- **Test script:** `DECLARE` + SQL of a real execution, ready for SSMS.
+- **Exportable HTML report** that opens offline.
 
-| Fonte | Como |
+## Supported sources
+
+| Source | How |
 |---|---|
-| Tabela | Qualquer tabela com o campo `statement` (mapeamento de colunas automático) |
-| Arquivo `.xel` | Lido pelo próprio SQL Server via `sys.fn_xe_file_target_read_file` (requer `VIEW SERVER STATE`) |
+| Table | Any table with the `statement` field (automatic column mapping) |
+| `.xel` file | Read by SQL Server itself through `sys.fn_xe_file_target_read_file` (requires `VIEW SERVER STATE`) |
+| Exported file | TSV created by `bcp` or by SSMS ([format](docs/export-format.md)); in the `.html` and in the `.exe` |
 
-Unidade de `duration`/`cpu_time`: microssegundos (padrão do XE) ou milissegundos.
+`duration`/`cpu_time` unit: microseconds (XE default) or milliseconds.
 
-## Privacidade e segurança
+## Privacy and security
 
-- Conecta somente ao SQL Server que você informar. Sem telemetria, sem chamadas externas.
-- A interface escuta só em `127.0.0.1` e exige um token aleatório por sessão (também valida o `Host`).
-- Senhas ficam apenas na memória do processo.
-- Os statements lidos são gravados num arquivo temporário (para os exemplos) e apagados ao encerrar.
+- Connects only to the SQL Server you specify. No telemetry, no external calls.
+- The interface listens on `127.0.0.1` only and requires a random per-session token (it also checks `Host`).
+- Passwords stay only in the process memory.
+- The statements read are written to a temporary file (for the samples) and deleted on exit.
+- In the HTML version, the file is read locally by the browser and never uploaded.
 
-## Compilar
+## Building
 
 ```bash
 go test ./...
 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o ParamLens.exe .
 ```
 
-Opções de linha de comando: `-port 8080` (porta fixa), `-no-browser` e `-bind` (padrão `127.0.0.1`).
+Command-line options: `-port 8080` (fixed port), `-no-browser`, `-bind` (default `127.0.0.1`) and
+`-write-html ParamLens.html` (writes the standalone HTML version and exits).
 
-### Sem Go instalado (Docker)
+The engine exists in Go (`.exe`) and in JavaScript (`web/engine.js`, HTML version). The parity test
+makes sure both produce the same result:
 
 ```bash
-docker build --target export --output dist .        # gera dist/ParamLens.exe (roda vet + testes)
-docker build -t paramlens .                          # imagem Linux
-docker run --rm -it -p 127.0.0.1:8765:8765 paramlens # abra o link "Interface:" do console
+PARAMLENS_PARITY_DIR=build/parity go test -run TestParityFixtures .
+node tools/parity.js build/parity
 ```
 
-No container só funciona autenticação SQL (não Windows/SSPI); para o SQL Server do próprio host use
-`host.docker.internal` como servidor.
+`tools/ui-smoke.js` drives the interface in a real Chromium (Playwright): file mode, both languages,
+the exported report and the server mode.
 
-## Estrutura
+### Without Go installed (Docker)
 
-| Arquivo | Conteúdo |
+```bash
+docker build --target export --output dist .        # builds dist/ParamLens.exe and dist/ParamLens.html (runs vet + tests)
+docker build -t paramlens .                          # Linux image
+docker run --rm -it -p 127.0.0.1:8765:8765 paramlens # open the "Interface:" link printed on the console
+```
+
+Inside the container only SQL authentication works (not Windows/SSPI); to reach the SQL Server running
+on the host, use `host.docker.internal` as the server.
+
+## Layout
+
+| File | Contents |
 |---|---|
-| `tsql.go` | Tokenizer T-SQL (strings com `''`/`N''`, `[ident]`, comentários aninhados, `@vars`) |
-| `rpc.go` | Parse de `sp_executesql`, `sp_prepexec` e `exec proc` (nomeados e posicionais) |
-| `normalize.go` | Normalização do SQL em famílias, listas IN, detecção de catch-all |
-| `engine.go` | Ingestão e avaliação de predicados por execução |
-| `stats.go` | Estatísticas, combinações, formatos de chamada e achados |
-| `source.go` | Fontes de dados (tabela, `.xel`, demo) |
-| `main.go` | Servidor local e API |
-| `web/index.html` | Interface (embutida no executável) |
+| `tsql.go` | T-SQL tokenizer (strings with `''`/`N''`, `[ident]`, nested comments, `@vars`) |
+| `rpc.go` | Parsing of `sp_executesql`, `sp_prepexec` and `exec proc` (named and positional) |
+| `normalize.go` | SQL normalization into families, IN lists, catch-all detection |
+| `engine.go` | Ingestion and per-execution predicate evaluation |
+| `stats.go` | Statistics, combinations, call shapes and findings (structured: message id + arguments) |
+| `source.go` | Data sources (table, `.xel`, demo) |
+| `main.go` | Local server and API |
+| `web/index.html` | Interface and its translations (embedded in the executable; also the HTML version and the exported report) |
+| `web/engine.js` | JavaScript engine (port of the Go engine) + exported-file reader |
+| `tools/parity.js`, `parity_test.go` | Go × JS parity test |
+| `tools/ui-smoke.js` | UI test in a real Chromium (Playwright) |
 
 ## Code signing
 
 Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
 See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
 
-## Licença
+## License
 
 [MIT](LICENSE) © 2026 Italo Mesquita — [Data Power's](#)

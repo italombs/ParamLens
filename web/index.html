@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -33,6 +33,7 @@ header{display:flex;align-items:center;gap:14px;padding:10px 18px;background:var
 .btn.sm{padding:3px 9px;font-size:12.5px}
 .btn:disabled{opacity:.5;cursor:default}
 .link{background:none;border:none;color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
+select.lang{width:auto;padding:5px 8px;font-size:12.5px}
 main{padding:18px;max-width:1500px;margin:0 auto}
 .grid2{display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:16px;align-items:start}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
@@ -55,7 +56,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);bor
 .hint{color:var(--mute);font-size:12px}
 .maps{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .hidden{display:none!important}
-/* resultados */
+/* results */
 .res{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start}
 .side{position:sticky;top:64px;max-height:calc(100vh - 82px);display:flex;flex-direction:column;padding:0;overflow:hidden}
 .side .head{padding:12px 14px;border-bottom:1px solid var(--line)}
@@ -84,7 +85,6 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);bor
 .find .tt{font-weight:600}
 .find .dd{color:var(--mute);font-size:13px;margin-top:3px}
 .find .sg{font-size:13px;margin-top:5px}
-.find .sg:before{content:"Sugestão: ";font-weight:600}
 .find .fm{font-size:12px;margin-top:6px}
 code,.code{font-family:var(--mono);font-size:12px}
 .code{background:var(--soft);border-radius:6px;padding:6px 8px;display:block;margin-top:6px;white-space:pre-wrap;word-break:break-word}
@@ -96,9 +96,9 @@ td.v{font-family:var(--mono);font-size:12px;word-break:break-all;max-width:420px
 tr.click{cursor:pointer}
 tr.click:hover td{background:var(--soft)}
 .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;background:var(--soft);color:var(--mute);white-space:nowrap}
-.badge.c-constante{background:var(--soft)}
-.badge.c-baixa{background:var(--accent-soft);color:var(--accent)}
-.badge.c-alta{background:var(--info-soft);color:var(--info)}
+.badge.c-constant{background:var(--soft)}
+.badge.c-low{background:var(--accent-soft);color:var(--accent)}
+.badge.c-high{background:var(--info-soft);color:var(--info)}
 .badge.ps{background:var(--mid-soft);color:var(--mid)}
 .pbar{display:flex;align-items:center;gap:7px;min-width:130px}
 .pbar .b{flex:1;height:8px;background:var(--soft);border-radius:4px;overflow:hidden;min-width:60px}
@@ -119,61 +119,69 @@ pre.sql{font-family:var(--mono);font-size:12px;background:var(--soft);padding:10
 @keyframes mv{0%{margin-left:-35%}100%{margin-left:100%}}
 .empty{color:var(--mute);padding:30px;text-align:center}
 .legend{font-size:12px;color:var(--mute);margin:-4px 0 10px}
+.drop{display:flex;flex-direction:column;align-items:center;gap:4px;border:2px dashed var(--line);border-radius:10px;padding:26px 14px;cursor:pointer;margin-bottom:14px;text-align:center}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.cmdh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 0 6px}
+.cmdh h3{margin:0}
+ol.steps{margin:4px 0 8px;padding-left:20px;font-size:12.5px;color:var(--mute)}
+ol.steps li{margin:2px 0}
 @media (max-width:1050px){.grid2,.res{grid-template-columns:1fr}.side{position:static;max-height:420px}}
 </style>
 </head>
 <body>
 <header>
   <div class="logo"><i></i>ParamLens</div>
-  <div class="sub" id="hdrSub">perfil de parâmetros do rpc_completed</div>
+  <div class="sub" id="hdrSub"></div>
   <div class="grow"></div>
-  <button class="btn hidden" id="btnNew">Nova análise</button>
-  <button class="btn hidden" id="btnExport">Exportar relatório HTML</button>
-  <button class="btn" id="btnQuit" title="Encerra o ParamLens">Encerrar</button>
+  <select class="lang" id="langSel" aria-label="Language / Idioma"><option value="en">English</option><option value="pt-BR">Português (BR)</option></select>
+  <button class="btn hidden" id="btnNew" data-i18n="btn.new"></button>
+  <button class="btn hidden" id="btnExport" data-i18n="btn.export"></button>
+  <button class="btn" id="btnQuit" data-i18n="btn.quit" data-i18n-title="btn.quitTitle"></button>
 </header>
 
 <main>
-<!-- ================= FONTE ================= -->
+<!-- ================= SOURCE (SQL Server) ================= -->
 <section id="vSetup" class="grid2">
   <div class="card">
-    <h2>1. Conexão</h2>
-    <div class="seg" id="segConn"><button data-v="fields" class="on">Campos</button><button data-v="string">Connection string</button></div>
+    <h2 data-i18n="conn.title"></h2>
+    <div class="seg" id="segConn"><button data-v="fields" class="on" data-i18n="conn.fields"></button><button data-v="string" data-i18n="conn.string"></button></div>
     <div id="connFields">
-      <label class="f"><span>Servidor (ex.: SRV01, SRV01\INST, 10.0.0.5,1433)</span><input type="text" id="cServer" placeholder="localhost"></label>
-      <label class="f"><span>Autenticação</span>
-        <select id="cAuth"><option value="windows">Windows (usuário atual)</option><option value="sql">SQL Server</option></select></label>
+      <label class="f"><span data-i18n="conn.server"></span><input type="text" id="cServer" placeholder="localhost"></label>
+      <label class="f"><span data-i18n="conn.auth"></span>
+        <select id="cAuth"><option value="windows" data-i18n="conn.authWin"></option><option value="sql">SQL Server</option></select></label>
       <div class="row" id="sqlAuth" style="display:none">
-        <label class="f"><span>Usuário</span><input type="text" id="cUser" autocomplete="off"></label>
-        <label class="f"><span>Senha</span><input type="password" id="cPass" autocomplete="off"></label>
+        <label class="f"><span data-i18n="conn.user"></span><input type="text" id="cUser" autocomplete="off"></label>
+        <label class="f"><span data-i18n="conn.pass"></span><input type="password" id="cPass" autocomplete="off"></label>
       </div>
       <div class="row">
-        <label class="f"><span>Criptografia</span>
-          <select id="cEnc"><option value="false">Opcional (padrão)</option><option value="true">Obrigatória</option><option value="strict">Strict (TDS 8)</option></select></label>
-        <label class="chk nf" style="margin-top:12px"><input type="checkbox" id="cTrust" checked> Confiar no certificado</label>
+        <label class="f"><span data-i18n="conn.enc"></span>
+          <select id="cEnc"><option value="false" data-i18n="conn.encOpt"></option><option value="true" data-i18n="conn.encReq"></option><option value="strict">Strict (TDS 8)</option></select></label>
+        <label class="chk nf" style="margin-top:12px"><input type="checkbox" id="cTrust" checked> <span data-i18n="conn.trust"></span></label>
       </div>
     </div>
     <div id="connString" class="hidden">
-      <label class="f"><span>Connection string (formato ADO)</span>
+      <label class="f"><span data-i18n="conn.strLabel"></span>
         <textarea id="cStr" rows="3" placeholder="server=SRV01;user id=x;password=y;TrustServerCertificate=true"></textarea></label>
     </div>
-    <div class="row"><button class="btn primary nf" id="btnConnect">Conectar</button><div id="connMsg"></div></div>
-    <p class="hint" style="margin-top:14px">A senha fica só na memória deste processo e não é gravada em disco.</p>
-    <p class="hint">Sem um servidor à mão? <button class="link" id="btnDemo">Carregar dados de exemplo</button></p>
+    <div class="row"><button class="btn primary nf" id="btnConnect" data-i18n="conn.connect"></button><div id="connMsg"></div></div>
+    <p class="hint" style="margin-top:14px" data-i18n="conn.pwHint"></p>
+    <p class="hint"><span data-i18n="conn.demoQ"></span> <button class="link" id="btnDemo" data-i18n="conn.demo"></button></p>
+    <p class="hint"><span data-i18n="conn.fileQ"></span> <button class="link" id="btnToFile" data-i18n="conn.file"></button></p>
   </div>
 
   <div class="card" id="srcCard">
-    <h2>2. Fonte dos eventos</h2>
-    <div class="seg" id="segSrc"><button data-v="table" class="on">Tabela com eventos</button><button data-v="xel">Arquivo .xel</button></div>
+    <h2 data-i18n="src.title"></h2>
+    <div class="seg" id="segSrc"><button data-v="table" class="on" data-i18n="src.table"></button><button data-v="xel" data-i18n="src.xel"></button></div>
 
     <div id="srcTable">
       <div class="row">
-        <label class="f"><span>Base de dados</span><select id="sDb" disabled><option>— conecte primeiro —</option></select></label>
-        <label class="f"><span>Tabela</span><select id="sTable" disabled></select></label>
+        <label class="f"><span data-i18n="src.db"></span><select id="sDb" disabled><option data-i18n="src.connectFirst"></option></select></label>
+        <label class="f"><span data-i18n="src.tbl"></span><select id="sTable" disabled></select></label>
       </div>
-      <h3>Mapeamento de colunas</h3>
+      <h3 data-i18n="src.maps"></h3>
       <div class="maps">
         <label class="f"><span>Statement (exec sp_executesql …) *</span><select id="m_stmt"></select></label>
-        <label class="f"><span>Nome do evento</span><select id="m_name"></select></label>
+        <label class="f"><span data-i18n="col.ev"></span><select id="m_name"></select></label>
         <label class="f"><span>duration</span><select id="m_duration"></select></label>
         <label class="f"><span>cpu_time</span><select id="m_cpu"></select></label>
         <label class="f"><span>logical_reads</span><select id="m_reads"></select></label>
@@ -182,38 +190,101 @@ pre.sql{font-family:var(--mono);font-size:12px;background:var(--soft);padding:10
         <label class="f"><span>row_count</span><select id="m_rows"></select></label>
       </div>
       <div class="row">
-        <label class="f"><span>Unidade de duration/cpu_time</span>
-          <select id="sUnit"><option value="us">microssegundos (padrão do XE)</option><option value="ms">milissegundos</option></select></label>
-        <label class="f"><span>Valor do evento</span><input type="text" id="sEvent" value="rpc_completed"></label>
+        <label class="f"><span data-i18n="src.unit"></span>
+          <select id="sUnit"><option value="us" data-i18n="unit.us"></option><option value="ms" data-i18n="unit.ms"></option></select></label>
+        <label class="f"><span data-i18n="src.evVal"></span><input type="text" id="sEvent" value="rpc_completed"></label>
       </div>
     </div>
 
     <div id="srcXel" class="hidden">
-      <label class="f"><span>Caminho do .xel <b>no servidor</b> (aceita curinga)</span>
-        <input type="text" id="sXel" placeholder="D:\XE\minha_sessao*.xel"></label>
-      <label class="f"><span>Evento</span><input type="text" id="sXelEvent" value="rpc_completed"></label>
-      <p class="hint">Lido pelo próprio SQL Server com sys.fn_xe_file_target_read_file (requer VIEW SERVER STATE). duration/cpu_time em µs.</p>
+      <label class="f"><span data-i18n-html="src.xelPath"></span>
+        <input type="text" id="sXel" placeholder="D:\XE\my_session*.xel"></label>
+      <label class="f"><span data-i18n="src.xelEv"></span><input type="text" id="sXelEvent" value="rpc_completed"></label>
+      <p class="hint" data-i18n="src.xelHint"></p>
     </div>
 
-    <h3>Filtros</h3>
-    <label class="f"><span>Statement LIKE (opcional)</span>
+    <h3 data-i18n="src.filters"></h3>
+    <label class="f"><span data-i18n="src.like"></span>
       <input type="text" id="sLike" placeholder="%MESSAGEIN%MESSAGETYPE%ASSIGNEETYPEID%"></label>
-    <label class="f"><span>WHERE adicional (opcional, T-SQL)</span>
+    <label class="f"><span data-i18n="src.where"></span>
       <textarea id="sWhere" rows="2" placeholder="[timestamp] >= '2026-11-19'"></textarea></label>
     <div class="row">
-      <label class="f"><span>Limitar a N linhas (0 = todas)</span><input type="number" id="sTop" value="0" min="0"></label>
-      <label class="chk" style="margin-top:12px"><input type="checkbox" id="sNormLit"> Agrupar queries que só mudam literais</label>
+      <label class="f"><span data-i18n="src.top"></span><input type="number" id="sTop" value="0" min="0"></label>
+      <label class="chk" style="margin-top:12px"><input type="checkbox" id="sNormLit"> <span data-i18n="src.normLit"></span></label>
     </div>
     <div class="row">
-      <button class="btn primary nf" id="btnAnalyze" disabled>Analisar</button>
-      <button class="btn nf" id="btnPreview" disabled>Ver query</button>
+      <button class="btn primary nf" id="btnAnalyze" disabled data-i18n="src.analyze"></button>
+      <button class="btn nf" id="btnPreview" disabled data-i18n="src.preview"></button>
       <div id="anMsg"></div>
     </div>
     <pre class="sql hidden" id="previewQ" style="margin-top:10px"></pre>
   </div>
 </section>
 
-<!-- ================= RESULTADOS ================= -->
+<!-- ================= EXPORTED FILE (standalone HTML version) ================= -->
+<section id="vFile" class="grid2 hidden">
+  <div class="card">
+    <h2 data-i18n="file.title"></h2>
+    <label class="drop" id="drop">
+      <input type="file" id="fFile" accept=".tsv,.txt,.csv,.dat,text/plain" hidden>
+      <b data-i18n="file.drop"></b>
+      <span class="hint" data-i18n="file.dropHint"></span>
+      <span class="ok" id="fName"></span>
+    </label>
+    <div class="row">
+      <label class="f"><span data-i18n="src.unit"></span>
+        <select id="fUnit"><option value="us" data-i18n="unit.us"></option><option value="ms" data-i18n="unit.ms"></option></select></label>
+      <label class="f"><span data-i18n="file.event"></span><input type="text" id="fEvent" value="rpc_completed"></label>
+    </div>
+    <label class="f"><span data-i18n="file.like"></span>
+      <input type="text" id="fLike" placeholder="%MESSAGEIN%MESSAGETYPE%"></label>
+    <label class="chk"><input type="checkbox" id="fNormLit"> <span data-i18n="src.normLit"></span></label>
+    <div class="row" style="margin-top:10px"><button class="btn primary nf" id="btnFileAnalyze" disabled data-i18n="src.analyze"></button><div id="fMsg"></div></div>
+    <p class="hint" style="margin-top:14px" data-i18n="file.private"></p>
+    <p class="hint hidden" id="fBackSrv"><button class="link" id="btnToSrv" data-i18n="file.back"></button></p>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="exp.title"></h2>
+    <div class="seg" id="segExp"><button data-v="xel" class="on" data-i18n="src.xel"></button><button data-v="table" data-i18n="src.table"></button></div>
+    <div id="expXel">
+      <label class="f"><span data-i18n-html="src.xelPath"></span><input type="text" id="eXel" placeholder="D:\XE\my_session*.xel"></label>
+    </div>
+    <div id="expTable" class="hidden">
+      <div class="row">
+        <label class="f"><span data-i18n="src.db"></span><input type="text" id="eDb" placeholder="DBA"></label>
+        <label class="f"><span data-i18n="src.tbl"></span><input type="text" id="eTable" value="dbo.__xe_event_file"></label>
+      </div>
+      <div class="maps" id="expCols"></div>
+      <label class="chk"><input type="checkbox" id="eOnlyRpc" checked> <span data-i18n="exp.onlyRpc"></span></label>
+    </div>
+    <div class="row">
+      <label class="f"><span data-i18n="exp.server"></span><input type="text" id="eServer" placeholder="SRV01\INST"></label>
+      <label class="f"><span data-i18n="exp.auth"></span>
+        <select id="eAuth"><option value="windows">Windows (-T)</option><option value="sql" data-i18n="exp.authSql"></option></select></label>
+      <label class="f hidden" id="eUserL"><span data-i18n="conn.user"></span><input type="text" id="eUser" autocomplete="off"></label>
+    </div>
+    <div class="row">
+      <label class="f"><span data-i18n="exp.like"></span><input type="text" id="eLike" placeholder="%MESSAGEIN%"></label>
+      <label class="f"><span data-i18n="src.top"></span><input type="number" id="eTop" value="0" min="0"></label>
+    </div>
+    <label class="f"><span data-i18n="exp.out"></span><input type="text" id="eOut" value="C:\temp\paramlens-events.tsv"></label>
+
+    <div class="cmdh"><h3 data-i18n="exp.bcp"></h3><button class="btn sm" data-copy="expBcp" data-i18n="copy"></button></div>
+    <pre class="sql" id="expBcp"></pre>
+    <p class="hint" data-i18n-html="exp.bcpHint"></p>
+
+    <div class="cmdh"><h3>SSMS</h3><button class="btn sm" data-copy="expSql" data-i18n="copy"></button></div>
+    <ol class="steps">
+      <li data-i18n="exp.s1"></li>
+      <li data-i18n-html="exp.s2"></li>
+      <li data-i18n="exp.s3"></li>
+    </ol>
+    <pre class="sql" id="expSql"></pre>
+  </div>
+</section>
+
+<!-- ================= RESULTS ================= -->
 <section id="vRes" class="hidden">
   <div class="kpis" id="totKpis"></div>
   <div class="res">
@@ -221,13 +292,13 @@ pre.sql{font-family:var(--mono);font-size:12px;background:var(--soft);padding:10
       <div class="head">
         <div class="row"><b class="nf">Queries</b><span class="hint" id="famCount"></span>
           <select id="famSort" class="nf" style="width:auto">
-            <option value="cost">por custo</option><option value="execs">por execuções</option><option value="sev">por achados</option></select></div>
-        <input type="text" id="famFilter" placeholder="filtrar por texto…" style="margin-top:8px">
+            <option value="cost" data-i18n="sort.cost"></option><option value="execs" data-i18n="sort.execs"></option><option value="sev" data-i18n="sort.sev"></option></select></div>
+        <input type="text" id="famFilter" data-i18n-ph="res.filter" style="margin-top:8px">
       </div>
       <div class="flist" id="famList"></div>
     </div>
     <div>
-      <div class="tabs" id="mainTabs"><button data-v="findings" class="on">Todos os achados</button><button data-v="family">Query selecionada</button><button data-v="fails">Não interpretados</button></div>
+      <div class="tabs" id="mainTabs"><button data-v="findings" class="on" data-i18n="tab.findings"></button><button data-v="family" data-i18n="tab.family"></button><button data-v="fails" data-i18n="tab.fails"></button></div>
       <div id="tFindings"></div>
       <div id="tFamily" class="hidden"></div>
       <div id="tFails" class="hidden"></div>
@@ -238,23 +309,24 @@ pre.sql{font-family:var(--mono);font-size:12px;background:var(--soft);padding:10
 
 <div class="overlay hidden" id="progOv">
   <div class="modal" style="width:min(520px,92vw)">
-    <b>Lendo eventos…</b>
+    <b data-i18n="prog.title"></b>
     <div class="prog"><i></i></div>
     <div id="progTxt" class="hint"></div>
-    <div class="row"><div></div><button class="btn nf" id="btnCancel">Cancelar</button></div>
+    <div class="row"><div></div><button class="btn nf" id="btnCancel" data-i18n="cancel"></button></div>
   </div>
 </div>
 
 <div class="overlay hidden" id="sampleOv">
   <div class="modal">
-    <div class="row"><b class="nf">Execução de exemplo</b><div></div>
-      <div class="seg nf" id="segSample" style="margin:0"><button data-v="script" class="on">Script de teste (DECLARE)</button><button data-v="statement">Statement original</button></div>
-      <button class="btn nf" id="btnCopy">Copiar</button><button class="btn nf" id="btnCloseSample">Fechar</button></div>
+    <div class="row"><b class="nf" data-i18n="sample.title"></b><div></div>
+      <div class="seg nf" id="segSample" style="margin:0"><button data-v="script" class="on" data-i18n="sample.script"></button><button data-v="statement" data-i18n="sample.stmt"></button></div>
+      <button class="btn nf" id="btnCopy" data-i18n="copy"></button><button class="btn nf" id="btnCloseSample" data-i18n="close"></button></div>
     <pre class="sql" id="sampleTxt"></pre>
   </div>
 </div>
 
 <!--STATIC-DATA-->
+<!--ENGINE-->
 <script>
 "use strict";
 const $ = s => document.querySelector(s);
@@ -262,33 +334,325 @@ const $$ = s => Array.from(document.querySelectorAll(s));
 const TOKEN = new URLSearchParams(location.search).get("t") || "";
 const staticEl = document.getElementById("static-data");
 const STATIC = staticEl ? JSON.parse(staticEl.textContent) : null;
+// JS engine (web/engine.js), injected at build time; missing only if index.html is opened unassembled
+const ENGINE = typeof PL !== "undefined" ? PL : null;
+// file mode (standalone HTML version): no server, the analysis runs in this browser
+let LOCAL = !STATIC && !TOKEN;
+// pristine copy of the page, used to export the report in file mode
+const PAGE_HTML = STATIC ? "" : "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
 const M = {dur:0,cpu:1,reads:2,phys:3,writes:4,rows:5};
-const MNAME = ["duração","CPU","logical reads","physical reads","writes","linhas"];
 let ov = null, curFam = null, curDetail = null, costM = -1, connOK = false, lastConn = null;
 const detailCache = {};
 
+/* ===================== i18n ===================== */
+const I18N = {
+en: {
+  "sub.default":"parameter profiling for rpc_completed", "sub.file":"parameter profiling for rpc_completed · exported file",
+  "sub.generated":"generated on {0}", "sub.canceled":"(canceled — partial data)",
+  "btn.new":"New analysis", "btn.export":"Export HTML report", "btn.quit":"Quit", "btn.quitTitle":"Shuts ParamLens down",
+  "conn.title":"1. Connection", "conn.fields":"Fields", "conn.string":"Connection string",
+  "conn.server":"Server (e.g. SRV01, SRV01\\INST, 10.0.0.5,1433)", "conn.auth":"Authentication", "conn.authWin":"Windows (current user)",
+  "conn.user":"User", "conn.pass":"Password", "conn.enc":"Encryption", "conn.encOpt":"Optional (default)", "conn.encReq":"Mandatory",
+  "conn.trust":"Trust server certificate", "conn.strLabel":"Connection string (ADO format)", "conn.connect":"Connect", "conn.connecting":"connecting…",
+  "conn.pwHint":"The password stays only in this process's memory and is never written to disk.",
+  "conn.demoQ":"No server at hand?", "conn.demo":"Load sample data", "conn.fileQ":"Already exported the events to a file?", "conn.file":"Open exported file",
+  "src.title":"2. Event source", "src.table":"Table with events", "src.xel":".xel file", "src.db":"Database", "src.tbl":"Table",
+  "src.connectFirst":"— connect first —", "src.maps":"Column mapping", "src.unit":"duration/cpu_time unit", "unit.us":"microseconds (XE default)", "unit.ms":"milliseconds",
+  "src.evVal":"Event value", "src.xelPath":".xel path <b>on the server</b> (wildcards allowed)", "src.xelEv":"Event",
+  "src.xelHint":"Read by SQL Server itself with sys.fn_xe_file_target_read_file (requires VIEW SERVER STATE). duration/cpu_time in µs.",
+  "src.filters":"Filters", "src.like":"Statement LIKE (optional)", "src.where":"Extra WHERE (optional, T-SQL)", "src.top":"Limit to N rows (0 = all)",
+  "src.normLit":"Group queries that differ only in literals", "src.analyze":"Analyze", "src.preview":"Show query",
+  "loading":"loading…", "noTables":"— no tables —", "tblRows":"{0} rows", "none":"(none)",
+  "col.ev":"Event name", "col.ts":"Date/time",
+  "file.title":"1. Exported file", "file.drop":"Drop the file here", "file.dropHint":"or click to choose · created by bcp or by SSMS \"Save Results As\"",
+  "file.event":"Event to analyze", "file.like":"Statement LIKE (optional; %, _ and [..] as in T-SQL)",
+  "file.private":"The file is read only in this browser: nothing is sent anywhere.", "file.back":"Back to the SQL Server connection",
+  "file.noEngine":"The analysis engine is missing from this page: open the ParamLens.html from the release.",
+  "file.noEvent":"no \"{0}\" event in the file", "file.ignored":" (ignored: {0})", "file.nOf":"{0} of {1}", "file.filtered":" · {0} outside the LIKE filter", "file.empty":" — is the file empty?",
+  "exp.title":"2. How to export the events", "exp.col":"Column: {0}", "exp.onlyRpc":"Export only rpc_completed (the table may also hold sp_statement_completed etc.)",
+  "exp.server":"Server", "exp.auth":"Authentication (bcp)", "exp.authSql":"SQL Server (-U, asks for the password)",
+  "exp.like":"Statement LIKE in the export (optional)", "exp.out":"Output file (bcp)", "exp.bcp":"bcp (recommended: no size limit)",
+  "exp.bcpHint":"Run it in PowerShell or cmd. <code>-w</code> writes Unicode (UTF-16) and keeps accents; do not use <code>-c</code>.",
+  "exp.s1":"Run the query below with results to grid (Ctrl+D).",
+  "exp.s2":"Right-click the grid › <b>Save Results As…</b> › type <b>Text (Tab delimited) (*.txt)</b>.",
+  "exp.s3":"The SSMS grid cuts each cell at 65,535 characters: longer statements show up here as \"cut\". In that case, use bcp.",
+  "copy":"Copy", "copied":"Copied ✓", "close":"Close", "cancel":"Cancel",
+  "sort.cost":"by cost", "sort.execs":"by executions", "sort.sev":"by findings", "res.filter":"filter by text…",
+  "tab.findings":"All findings", "tab.family":"Selected query", "tab.fails":"Not parsed",
+  "prog.title":"Reading events…", "prog.file":"{0} of the file · ", "prog.line":"{0} rows read · {1} parsed · {2} failed · {3} s",
+  "sample.title":"Sample execution", "sample.script":"Test script (DECLARE)", "sample.stmt":"Original statement", "sample.btn":"Sample", "sample.btnSm":"sample",
+  "kpi.execs":"Executions", "kpi.distinct":"{0} distinct queries", "kpi.dur":"Total duration", "kpi.cpu":"Total CPU", "kpi.reads":"Logical reads", "kpi.avg":"avg {0}",
+  "kpi.fails":"Not parsed", "kpi.failsOf":"{0} of the rows", "kpi.findings":"Findings", "kpi.high":"{0} high priority",
+  "kpi.ofTotal":"{0} of total", "kpi.mAvg":"{0} avg", "kpi.maxOf":"{0} of total · max {1}", "kpi.rowsAvg":"rows avg",
+  "fam.count":"{0} of {1}", "fam.execs":"{0} exec · {1}", "fam.findings":"{0} finding(s)", "fam.nothing":"nothing found", "fam.execWord":"executions",
+  "fam.proc":"Procedure {0}", "fam.via":"Query via {0}", "fam.sql":"Sample SQL", "fam.declsN":" · {0} parameter declaration(s)",
+  "fam.declsT":"Parameter declarations", "fam.decl":"Declaration", "fam.findingsT":"Findings",
+  "find.legend":"<span class=\"dot s3\"></span> high &nbsp; <span class=\"dot s2\"></span> medium &nbsp; <span class=\"dot s1\"></span> info — sorted by priority and query weight",
+  "find.none":"No findings. See each query's details in the list beside.", "find.sugg":"Suggestion:", "find.fam":"{0} exec · {1} of {2}", "find.total":"total",
+  "trunc.title":"{0} statement(s) cut at 65,535 characters by the SSMS grid",
+  "trunc.detail":"These rows were left out of the analysis (\"Not parsed\" tab). Export with bcp to read the full statements.",
+  "fails.none":"All rows were parsed.", "fails.title":"{0} row(s) not parsed", "fails.reason":"Reason", "fails.rows":"Rows", "fails.examples":"Examples",
+  "fi.title":"File", "fi.enc":"Encoding", "fi.lines":"Data rows", "fi.header":"Header", "yes":"yes", "no":"no", "fi.period":"Period", "fi.periodVal":"{0} to {1}",
+  "fi.ignored":"Ignored: event {0}", "fi.filtered":"Outside the LIKE filter", "fi.bad":"Wrong format (9 TAB-separated columns)", "fi.cut":"Cut by SSMS (65,535 characters)",
+  "pat.title":"Catch-all predicates (OR / ISNULL)",
+  "pat.legend":"% of executions in which the parameter-side condition is true — when true, the other side of the OR filters nothing.",
+  "pat.cond":"Condition", "pat.true":"True in", "pat.avgT":"{0} avg (T)", "pat.avgF":"{0} avg (F)", "pat.snip":"Snippet", "pat.of":"{0} of {1}",
+  "shp.title":"Call shapes",
+  "shp.legend":"Each row is a combination of catch-alls: <span class=\"badge c-high\">filter</span> = the filter was applied; <span class=\"badge\">pass-through</span> = the parameter condition was true and the OR filtered nothing.",
+  "col.execs":"Executions", "col.pctExecs":"% executions", "col.pctCost":"% cost", "col.mAvg":"{0} avg",
+  "par.title":"Parameters", "par.legend":"Click a row to see the value distribution.", "par.legendCost":" \"Cost\" = share of this query's {0}.",
+  "par.name":"Parameter", "par.type":"Type", "par.card":"Cardinality", "par.distinct":"Distinct", "par.top":"Most common value", "par.inList":"IN list", "par.inSize":"IN size", "par.types":"+{0} types",
+  "card.constant":"constant", "card.low":"low", "card.high":"high",
+  "val.value":"Value", "val.byClass":"By class", "val.top":"Most frequent values", "val.others":"(other values)",
+  "cmb.title":"Value combinations",
+  "cmb.legend":"Pick the parameters that make up the combination. High-cardinality parameters enter by <b>class</b> (NULL, 0, '', null date, (value)…).",
+  "cmb.static":" In the exported report the selection is fixed.", "cmb.pick":"Select at least one parameter.", "cmb.count":"{0} distinct combination(s)",
+  "cmb.showing":" · showing the {0} most frequent", "cmb.csv":"Export CSV", "cmb.class":"class", "cmb.computing":"computing…",
+  "quit.confirm":"Quit ParamLens?", "quit.done":"ParamLens has quit. You can close this tab.", "err":"Error: ", "exportFail":"Could not export: ",
+  "metrics":["duration","CPU","logical reads","physical reads","writes","rows"],
+  "script.header":"-- Generated by ParamLens from a real execution",
+},
+"pt-BR": {
+  "sub.default":"perfil de parâmetros do rpc_completed", "sub.file":"perfil de parâmetros do rpc_completed · arquivo exportado",
+  "sub.generated":"gerado em {0}", "sub.canceled":"(cancelado — dados parciais)",
+  "btn.new":"Nova análise", "btn.export":"Exportar relatório HTML", "btn.quit":"Encerrar", "btn.quitTitle":"Encerra o ParamLens",
+  "conn.title":"1. Conexão", "conn.fields":"Campos", "conn.string":"Connection string",
+  "conn.server":"Servidor (ex.: SRV01, SRV01\\INST, 10.0.0.5,1433)", "conn.auth":"Autenticação", "conn.authWin":"Windows (usuário atual)",
+  "conn.user":"Usuário", "conn.pass":"Senha", "conn.enc":"Criptografia", "conn.encOpt":"Opcional (padrão)", "conn.encReq":"Obrigatória",
+  "conn.trust":"Confiar no certificado", "conn.strLabel":"Connection string (formato ADO)", "conn.connect":"Conectar", "conn.connecting":"conectando…",
+  "conn.pwHint":"A senha fica só na memória deste processo e não é gravada em disco.",
+  "conn.demoQ":"Sem um servidor à mão?", "conn.demo":"Carregar dados de exemplo", "conn.fileQ":"Já exportou os eventos para um arquivo?", "conn.file":"Abrir arquivo exportado",
+  "src.title":"2. Fonte dos eventos", "src.table":"Tabela com eventos", "src.xel":"Arquivo .xel", "src.db":"Base de dados", "src.tbl":"Tabela",
+  "src.connectFirst":"— conecte primeiro —", "src.maps":"Mapeamento de colunas", "src.unit":"Unidade de duration/cpu_time", "unit.us":"microssegundos (padrão do XE)", "unit.ms":"milissegundos",
+  "src.evVal":"Valor do evento", "src.xelPath":"Caminho do .xel <b>no servidor</b> (aceita curinga)", "src.xelEv":"Evento",
+  "src.xelHint":"Lido pelo próprio SQL Server com sys.fn_xe_file_target_read_file (requer VIEW SERVER STATE). duration/cpu_time em µs.",
+  "src.filters":"Filtros", "src.like":"Statement LIKE (opcional)", "src.where":"WHERE adicional (opcional, T-SQL)", "src.top":"Limitar a N linhas (0 = todas)",
+  "src.normLit":"Agrupar queries que só mudam literais", "src.analyze":"Analisar", "src.preview":"Ver query",
+  "loading":"carregando…", "noTables":"— nenhuma tabela —", "tblRows":"{0} linhas", "none":"(nenhuma)",
+  "col.ev":"Nome do evento", "col.ts":"Data/hora",
+  "file.title":"1. Arquivo exportado", "file.drop":"Arraste o arquivo aqui", "file.dropHint":"ou clique para escolher · gerado pelo bcp ou pelo \"Save Results As\" do SSMS",
+  "file.event":"Evento analisado", "file.like":"Statement LIKE (opcional; %, _ e [..] como no T-SQL)",
+  "file.private":"O arquivo é lido só neste navegador: nada é enviado para lugar nenhum.", "file.back":"Voltar para a conexão com o SQL Server",
+  "file.noEngine":"Motor de análise ausente nesta página: abra o ParamLens.html da release.",
+  "file.noEvent":"nenhum evento \"{0}\" no arquivo", "file.ignored":" (ignoradas: {0})", "file.nOf":"{0} de {1}", "file.filtered":" · {0} fora do filtro LIKE", "file.empty":" — o arquivo está vazio?",
+  "exp.title":"2. Como exportar os eventos", "exp.col":"Coluna: {0}", "exp.onlyRpc":"Exportar só rpc_completed (a tabela pode ter sp_statement_completed etc.)",
+  "exp.server":"Servidor", "exp.auth":"Autenticação (bcp)", "exp.authSql":"SQL Server (-U, pede a senha)",
+  "exp.like":"Statement LIKE na exportação (opcional)", "exp.out":"Arquivo de saída (bcp)", "exp.bcp":"bcp (recomendado: sem limite de tamanho)",
+  "exp.bcpHint":"Rode no PowerShell ou no cmd. <code>-w</code> grava em Unicode (UTF-16) e preserva acentos; não use <code>-c</code>.",
+  "exp.s1":"Rode a query abaixo com resultado em grid (Ctrl+D).",
+  "exp.s2":"Clique com o botão direito no grid › <b>Save Results As…</b> › tipo <b>Text (Tab delimited) (*.txt)</b>.",
+  "exp.s3":"O grid do SSMS corta cada célula em 65.535 caracteres: statements maiores aparecem como \"cortados\" aqui. Nesse caso, use o bcp.",
+  "copy":"Copiar", "copied":"Copiado ✓", "close":"Fechar", "cancel":"Cancelar",
+  "sort.cost":"por custo", "sort.execs":"por execuções", "sort.sev":"por achados", "res.filter":"filtrar por texto…",
+  "tab.findings":"Todos os achados", "tab.family":"Query selecionada", "tab.fails":"Não interpretados",
+  "prog.title":"Lendo eventos…", "prog.file":"{0} do arquivo · ", "prog.line":"{0} linhas lidas · {1} interpretadas · {2} com falha · {3} s",
+  "sample.title":"Execução de exemplo", "sample.script":"Script de teste (DECLARE)", "sample.stmt":"Statement original", "sample.btn":"Exemplo", "sample.btnSm":"exemplo",
+  "kpi.execs":"Execuções", "kpi.distinct":"{0} queries distintas", "kpi.dur":"Duração total", "kpi.cpu":"CPU total", "kpi.reads":"Logical reads", "kpi.avg":"média {0}",
+  "kpi.fails":"Não interpretados", "kpi.failsOf":"{0} das linhas", "kpi.findings":"Achados", "kpi.high":"{0} de alta prioridade",
+  "kpi.ofTotal":"{0} do total", "kpi.mAvg":"{0} média", "kpi.maxOf":"{0} do total · máx {1}", "kpi.rowsAvg":"linhas média",
+  "fam.count":"{0} de {1}", "fam.execs":"{0} exec · {1}", "fam.findings":"{0} achado(s)", "fam.nothing":"nada encontrado", "fam.execWord":"execuções",
+  "fam.proc":"Procedure {0}", "fam.via":"Query via {0}", "fam.sql":"SQL de exemplo", "fam.declsN":" · {0} declaração(ões) de parâmetros",
+  "fam.declsT":"Declarações de parâmetros", "fam.decl":"Declaração", "fam.findingsT":"Achados",
+  "find.legend":"<span class=\"dot s3\"></span> alta &nbsp; <span class=\"dot s2\"></span> média &nbsp; <span class=\"dot s1\"></span> informativo — ordenado por prioridade e peso da query",
+  "find.none":"Nenhum achado. Veja os detalhes de cada query na lista ao lado.", "find.sugg":"Sugestão:", "find.fam":"{0} exec · {1} do {2}", "find.total":"total",
+  "trunc.title":"{0} statement(s) cortado(s) em 65.535 caracteres pelo grid do SSMS",
+  "trunc.detail":"Essas linhas ficaram fora da análise (aba \"Não interpretados\"). Exporte com o bcp para ler os statements inteiros.",
+  "fails.none":"Todas as linhas foram interpretadas.", "fails.title":"{0} linha(s) não interpretada(s)", "fails.reason":"Motivo", "fails.rows":"Linhas", "fails.examples":"Exemplos",
+  "fi.title":"Arquivo", "fi.enc":"Codificação", "fi.lines":"Linhas de dados", "fi.header":"Cabeçalho", "yes":"sim", "no":"não", "fi.period":"Período", "fi.periodVal":"{0} a {1}",
+  "fi.ignored":"Ignoradas: evento {0}", "fi.filtered":"Fora do filtro LIKE", "fi.bad":"Fora do formato (9 colunas com TAB)", "fi.cut":"Cortadas pelo SSMS (65.535 caracteres)",
+  "pat.title":"Predicados catch-all (OR / ISNULL)",
+  "pat.legend":"% de execuções em que a condição do lado do parâmetro é verdadeira — quando verdadeira, o outro lado do OR não filtra nada.",
+  "pat.cond":"Condição", "pat.true":"Verdadeira em", "pat.avgT":"{0} méd. (V)", "pat.avgF":"{0} méd. (F)", "pat.snip":"Trecho", "pat.of":"{0} de {1}",
+  "shp.title":"Formatos de chamada",
+  "shp.legend":"Cada linha é uma combinação de catch-alls: <span class=\"badge c-high\">filtra</span> = o filtro foi aplicado; <span class=\"badge\">pass-through</span> = a condição do parâmetro era verdadeira e o OR não filtrou nada.",
+  "col.execs":"Execuções", "col.pctExecs":"% execuções", "col.pctCost":"% custo", "col.mAvg":"{0} méd.",
+  "par.title":"Parâmetros", "par.legend":"Clique numa linha para ver a distribuição de valores.", "par.legendCost":" \"Custo\" = participação no {0} desta query.",
+  "par.name":"Parâmetro", "par.type":"Tipo", "par.card":"Cardinalidade", "par.distinct":"Distintos", "par.top":"Valor mais comum", "par.inList":"lista IN", "par.inSize":"tam. IN", "par.types":"+{0} tipos",
+  "card.constant":"constante", "card.low":"baixa", "card.high":"alta",
+  "val.value":"Valor", "val.byClass":"Por classe", "val.top":"Valores mais frequentes", "val.others":"(demais valores)",
+  "cmb.title":"Combinações de valores",
+  "cmb.legend":"Escolha os parâmetros que formam a combinação. Parâmetros de alta cardinalidade entram por <b>classe</b> (NULL, 0, '', data nula, (valor)…).",
+  "cmb.static":" No relatório exportado a seleção é fixa.", "cmb.pick":"Selecione ao menos um parâmetro.", "cmb.count":"{0} combinação(ões) distinta(s)",
+  "cmb.showing":" · mostrando as {0} mais frequentes", "cmb.csv":"Exportar CSV", "cmb.class":"classe", "cmb.computing":"calculando…",
+  "quit.confirm":"Encerrar o ParamLens?", "quit.done":"ParamLens encerrado. Pode fechar esta aba.", "err":"Erro: ", "exportFail":"Não foi possível exportar: ",
+  "metrics":["duração","CPU","logical reads","physical reads","writes","linhas"],
+  "script.header":"-- Gerado pelo ParamLens a partir de uma execução real",
+}};
+
+// ids/messages produced by the engines and the server (in English) -> pt-BR
+const PT_VALUES = {"(absent)":"(ausente)", "(no value)":"(sem valor)", "(other values…)":"(outros valores…)", "(number ≠ 0/1/-1)":"(número ≠ 0/1/-1)",
+  "(date)":"(data)", "(text)":"(texto)", "(other)":"(outro)", "filter":"filtra", "sample data":"dados de exemplo"};
+const PT_MESSAGES = [
+  [/^not an EXEC call$/, "não é uma chamada EXEC"], [/^EXEC without a procedure name$/, "EXEC sem nome de procedimento"],
+  [/^empty statement$/, "statement vazio"], [/^inner SQL of (\S+) not found$/, "SQL interno do $1 não encontrado"],
+  [/^line does not match the format \(expected (\d+) TAB-separated columns(; looks like CSV: save as tab-delimited text)?\)$/,
+    (m, n, csv) => `linha fora do formato (esperadas ${n} colunas separadas por TAB${csv ? "; parece CSV: salve como texto com TAB" : ""})`],
+  [/^statement cut at 65,535 characters \(SSMS grid limit\) — export with bcp$/, "statement cortado em 65.535 caracteres (limite do grid do SSMS) — exporte com bcp"],
+  [/^an analysis is already running$/, "já existe uma análise em andamento"], [/^no finished analysis$/, "nenhuma análise concluída"],
+  [/^query not found$/, "família não encontrada"], [/^execution not found$/, "execução não encontrada"],
+  [/^enter the connection string$/, "informe a connection string"], [/^enter the server$/, "informe o servidor"],
+  [/^choose the database, the table and the statement column$/, "escolha a base, a tabela e a coluna do statement"],
+  [/^enter the \.xel path \(on the server\)$/, "informe o caminho do .xel (no servidor)"], [/^unknown source: (.*)$/, "fonte desconhecida: $1"],
+  [/^invalid host$/, "host inválido"], [/^invalid token — reopen the link shown in the console$/, "token inválido — reabra pelo link mostrado no console"],
+  [/^not available in file mode$/, "indisponível no modo arquivo"],
+];
+
+let LANG = "en";
+try{ const s = localStorage.getItem("paramlens.lang"); if(s && I18N[s]) LANG = s }catch(e){ /* storage unavailable */ }
+{ const q = new URLSearchParams(location.search).get("lang"); if(q && I18N[q]) LANG = q }
+let nf0, nf1, nfP;
+function setLocale(){
+  nf0 = new Intl.NumberFormat(LANG,{maximumFractionDigits:0});
+  nf1 = new Intl.NumberFormat(LANG,{maximumFractionDigits:1});
+  nfP = new Intl.NumberFormat(LANG,{minimumFractionDigits:1,maximumFractionDigits:1});
+}
+setLocale();
+function t(key, ...args){
+  let s = I18N[LANG][key]; if(s === undefined) s = I18N.en[key]; if(s === undefined) return key;
+  return typeof s === "string" ? s.replace(/\{(\d)\}/g, (m,i)=> args[+i]) : s;
+}
+const MNAME = () => t("metrics");
+// engine/server text -> current language
+function tm(s){
+  if(LANG !== "pt-BR" || s == null) return s;
+  for(const [re, rep] of PT_MESSAGES) if(re.test(s)) return s.replace(re, rep);
+  return s;
+}
+// values shown in tables (sentinels such as "(absent)", the "#items " prefix)
+function tv(s){
+  if(LANG !== "pt-BR" || s == null) return s;
+  s = String(s);
+  if(PT_VALUES[s]) return PT_VALUES[s];
+  return s.replace(/\((absent|no value|other values…|number ≠ 0\/1\/-1|date|text|other)\)/g, m=> PT_VALUES[m] || m).replace(/^#items /, "#itens ");
+}
+function applyLang(){
+  document.documentElement.lang = LANG;
+  $("#langSel").value = LANG;
+  $$("[data-i18n]").forEach(el=> el.textContent = t(el.dataset.i18n));
+  $$("[data-i18n-html]").forEach(el=> el.innerHTML = t(el.dataset.i18nHtml));
+  $$("[data-i18n-ph]").forEach(el=> el.placeholder = t(el.dataset.i18nPh));
+  $$("[data-i18n-title]").forEach(el=> el.title = t(el.dataset.i18nTitle));
+  renderExpCols(); renderExport(); renderHdr();
+  if(tables.length) renderTableOpts();
+  if(ov && !$("#vRes").classList.contains("hidden")){
+    renderTotals(); renderFamList(); renderAllFindings(); renderFails();
+    if(curDetail) renderFamily();
+  }
+}
+$("#langSel").addEventListener("change", e=>{
+  LANG = e.target.value; setLocale();
+  try{ localStorage.setItem("paramlens.lang", LANG) }catch(err){ /* storage unavailable */ }
+  applyLang();
+});
+
+/* ===================== formatting ===================== */
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-const nf0 = new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
-const nf1 = new Intl.NumberFormat("pt-BR",{maximumFractionDigits:1});
 function fN(v){return nf0.format(v)}
 function fP(v){return (v*100>=10||v===0?nf0:nf1).format(v*100)+"%"}
-function fM(m,v){ // métricas: dur/cpu em µs
+function fP1(v){return nfP.format(v*100)+"%"}
+function fM(m,v){ // metrics: dur/cpu in µs
   if(m===M.dur||m===M.cpu){const ms=v/1000; return ms>=1000? nf1.format(ms/1000)+" s" : nf1.format(ms)+" ms"}
   return v>=100? nf0.format(v) : nf1.format(v)
 }
 function avg(a,m){return a.count? a.sum[m]/a.count : 0}
 
+/* ===================== findings text (engines emit msg + args) ===================== */
+const FMSG = {
+en: {
+  cost: a=> a.cost ? ` Average ${MNAME()[a.cost.m]}: ${fM(a.cost.m,a.cost.t)} when true × ${fM(a.cost.m,a.cost.f)} when false.` : "",
+  "isnull": (a,f,c)=>({t:`ISNULL/COALESCE on a parameter: ${a.var} is NULL in ${fP1(a.pct)} of executions`,
+    d:`Pattern ${f.code}. Functions over the column/parameter usually prevent seeks, and the plan is the same for both cases.`+c(a),
+    s:`Rewrite as (${a.var} IS NULL OR col = ${a.var}) with OPTION(RECOMPILE), or split the two forms of the query.`}),
+  "catchall.always": (a,f,c)=>({t:`Catch-all always true: ${a.cond} in 100% of executions`,
+    d:"The other side of the OR never filters anything in this sample, but the optimizer needs a plan that serves both cases."+c(a),
+    s:"The filter seems never to be used: remove the branch, or split the query for the case where it applies."}),
+  "catchall.mostly": (a,f,c)=>({t:`Catch-all: ${a.cond} is true in ${fP1(a.pct)} of executions`,
+    d:"In most calls the OR becomes a pass-through (the filter does not apply). The single cached plan is usually a scan/hash to serve both cases."+c(a),
+    s:"Split into two queries (or IF/ELSE, two Advanced SQLs in OutSystems), build the filter dynamically only when it applies, or use OPTION(RECOMPILE). If the filter depends on a LEFT JOIN used only to filter, replace it with EXISTS/NOT EXISTS conditioned on the parameter."}),
+  "catchall.never": (a,f,c)=>({t:`Catch-all never true: ${a.cond} in 0% of executions`,
+    d:"The filter always applies in this sample; the OR branch is dead weight that still hurts the estimate."+c(a),
+    s:`Remove the '${a.cond} OR' branch if it is not needed by other flows.`}),
+  "catchall.rare": (a,f,c)=>({t:`Catch-all: ${a.cond} is true in only ${fP1(a.pct)} of executions`,
+    d:"In most calls the filter is applied, but the plan has to cover the unfiltered case."+c(a),
+    s:"Consider moving the rare (unfiltered) case to another query/branch or using OPTION(RECOMPILE) in that flow."}),
+  "catchall.split": (a,f,c)=>({t:`Split catch-all: ${a.cond} is true in ${fP1(a.pct)} of executions`,
+    d:"Two very different access patterns share the same cached plan."+c(a),
+    s:"Good candidate for OPTION(RECOMPILE) or for splitting into two queries."}),
+  "dominant": a=>({t:`${a.name} is ${tv(a.value)} in ${fP1(a.pct)} of executions`, d:"Dominant value: the cached plan will almost always be compiled for it."}),
+  "dominant.sniff": a=>({t:`${a.name} is ${tv(a.value)} in ${fP1(a.pct)} of executions — very different cost for the other values`,
+    d:`Average ${MNAME()[a.m]}: ${fM(a.m,a.a1)} with ${tv(a.value)} × ${fM(a.m,a.a2)} with the other values. Strong sign of parameter sniffing.`,
+    s:"Consider OPTION(RECOMPILE), OPTIMIZE FOR, or splitting the dominant value's flow from the rest."}),
+  "unequal": a=>({t:`Unequal cost per value of ${a.name} (up to ${fN(a.ratio)}x)`,
+    d:`Average ${MNAME()[a.m]}: ${fM(a.m,a.max)} with ${tv(a.maxV)} × ${fM(a.m,a.min)} with ${tv(a.minV)}.`,
+    s:"Possible parameter sensitivity: the plan compiled for one value may be bad for the other."}),
+  "constants": a=>({t:`${a.count} parameter(s) that always have the same value`,
+    d:a.items.map(tv).join("; ") + (a.more? `; … (+${a.more})` : "") + ". They may be fixed in the application: predicates using them are always the same and sometimes removable."}),
+  "combo.costly": a=>({t:`A combination with ${fP1(a.pct)} of executions accounts for ${fP1(a.share)} of ${MNAME()[a.m]}`, d:a.parts.map(tv).join(", ")}),
+  "decls": a=>({t:`${a.count} different parameter declarations for the same query`,
+    d:"Types or sizes vary between calls (e.g. nvarchar(5) × nvarchar(4000)). Each variation produces a separate plan in the cache.",
+    s:"Standardize parameter types/sizes in the driver/application."}),
+  "inlist.distinct": a=>({t:`${a.name}: ${fN(a.count)} distinct value lists`,
+    d:"Since the values are inline in the text, each different list produces a distinct SQL text and its own compilation (cache bloat, compilation CPU).",
+    s:"Consider passing the list as a parameter (STRING_SPLIT/TVP/JSON) or, in OutSystems, a helper table with EXISTS."}),
+  "inlist.size": a=>({t:`${a.name} reaches ${fN(a.max)} items`, d:"Large IN lists increase compilation cost and degrade cardinality estimates."}),
+},
+"pt-BR": {
+  cost: a=> a.cost ? ` Média de ${MNAME()[a.cost.m]}: ${fM(a.cost.m,a.cost.t)} quando verdadeiro × ${fM(a.cost.m,a.cost.f)} quando falso.` : "",
+  "isnull": (a,f,c)=>({t:`ISNULL/COALESCE com parâmetro: ${a.var} é NULL em ${fP1(a.pct)} das execuções`,
+    d:`Padrão ${f.code}. Funções sobre a coluna/parâmetro costumam impedir seek e o plano é o mesmo para os dois casos.`+c(a),
+    s:`Reescreva como (${a.var} IS NULL OR col = ${a.var}) com OPTION(RECOMPILE), ou separe as duas formas da query.`}),
+  "catchall.always": (a,f,c)=>({t:`Catch-all sempre verdadeiro: ${a.cond} em 100% das execuções`,
+    d:"O outro lado do OR nunca filtra nada nesta amostra, mas o otimizador precisa de um plano que sirva para os dois casos."+c(a),
+    s:"O filtro parece nunca ser usado: remova o ramo, ou separe a query para o caso em que ele é aplicado."}),
+  "catchall.mostly": (a,f,c)=>({t:`Catch-all: ${a.cond} é verdadeiro em ${fP1(a.pct)} das execuções`,
+    d:"Na maioria das chamadas o OR vira pass-through (o filtro não se aplica). O plano único em cache costuma ser scan/hash para servir ambos os casos."+c(a),
+    s:"Separe em duas queries (ou IF/ELSE, duas Advanced SQL no OutSystems), monte o filtro dinamicamente só quando aplicável, ou use OPTION(RECOMPILE). Se o filtro depende de um LEFT JOIN usado só para filtrar, troque por EXISTS/NOT EXISTS condicionado ao parâmetro."}),
+  "catchall.never": (a,f,c)=>({t:`Catch-all nunca verdadeiro: ${a.cond} em 0% das execuções`,
+    d:"O filtro sempre se aplica nesta amostra; o ramo do OR é peso morto que ainda atrapalha a estimativa."+c(a),
+    s:`Remova o ramo '${a.cond} OR' se ele não for necessário em outros fluxos.`}),
+  "catchall.rare": (a,f,c)=>({t:`Catch-all: ${a.cond} é verdadeiro em só ${fP1(a.pct)} das execuções`,
+    d:"Na maioria das chamadas o filtro é aplicado, mas o plano precisa contemplar o caso sem filtro."+c(a),
+    s:"Considere separar o caso raro (sem filtro) em outra query/branch ou usar OPTION(RECOMPILE) nesse fluxo."}),
+  "catchall.split": (a,f,c)=>({t:`Catch-all dividido: ${a.cond} é verdadeiro em ${fP1(a.pct)} das execuções`,
+    d:"Dois padrões de acesso bem diferentes compartilham o mesmo plano em cache."+c(a),
+    s:"Bom candidato a OPTION(RECOMPILE) ou a separar em duas queries."}),
+  "dominant": a=>({t:`${a.name} vale ${tv(a.value)} em ${fP1(a.pct)} das execuções`, d:"Valor dominante: o plano em cache quase sempre será compilado para ele."}),
+  "dominant.sniff": a=>({t:`${a.name} vale ${tv(a.value)} em ${fP1(a.pct)} das execuções — custo muito diferente nos demais valores`,
+    d:`Média de ${MNAME()[a.m]}: ${fM(a.m,a.a1)} com ${tv(a.value)} × ${fM(a.m,a.a2)} com os demais valores. Forte indício de parameter sniffing.`,
+    s:"Avalie OPTION(RECOMPILE), OPTIMIZE FOR, ou separar o fluxo do valor dominante do restante."}),
+  "unequal": a=>({t:`Custo desigual por valor de ${a.name} (até ${fN(a.ratio)}x)`,
+    d:`Média de ${MNAME()[a.m]}: ${fM(a.m,a.max)} com ${tv(a.maxV)} × ${fM(a.m,a.min)} com ${tv(a.minV)}.`,
+    s:"Possível sensibilidade a parâmetro: o plano compilado para um valor pode ser ruim para o outro."}),
+  "constants": a=>({t:`${a.count} parâmetro(s) com valor sempre igual`,
+    d:a.items.map(tv).join("; ") + (a.more? `; … (+${a.more})` : "") + ". Podem estar fixos na aplicação: predicados com eles são sempre iguais e às vezes removíveis."}),
+  "combo.costly": a=>({t:`Combinação com ${fP1(a.pct)} das execuções responde por ${fP1(a.share)} do ${MNAME()[a.m]}`, d:a.parts.map(tv).join(", ")}),
+  "decls": a=>({t:`${a.count} declarações de parâmetros diferentes para a mesma query`,
+    d:"Tipos ou tamanhos variam entre chamadas (ex.: nvarchar(5) × nvarchar(4000)). Cada variação gera um plano separado no cache.",
+    s:"Padronize tipo/tamanho dos parâmetros no driver/aplicação."}),
+  "inlist.distinct": a=>({t:`${tv(a.name)}: ${fN(a.count)} listas de valores distintas`,
+    d:"Como os valores vão inline no texto, cada lista diferente gera um texto SQL distinto e uma compilação própria (cache bloat, CPU de compilação).",
+    s:"Avalie passar a lista como parâmetro (STRING_SPLIT/TVP/JSON) ou, no OutSystems, uma tabela de apoio com EXISTS."}),
+  "inlist.size": a=>({t:`${a.name} chega a ${fN(a.max)} itens`, d:"Listas IN grandes aumentam o custo de compilação e degradam a estimativa de cardinalidade."}),
+}};
+function findingText(f){
+  const L = FMSG[LANG] || FMSG.en;
+  const fn = L[f.msg] || FMSG.en[f.msg];
+  if(!fn) return {t: f.title || f.msg || "", d: f.detail || "", s: f.suggestion || ""};
+  return fn(f.args || {}, f, L.cost);
+}
+
 async function api(path, body){
+  if(LOCAL) return localApi(path, body);
   const opt = {headers:{"X-Token":TOKEN}};
   if(body!==undefined){opt.method="POST";opt.body=JSON.stringify(body);opt.headers["Content-Type"]="application/json"}
   const r = await fetch(path, opt);
   const txt = await r.text();
-  let j; try{ j = JSON.parse(txt) }catch(e){ throw new Error(txt||("HTTP "+r.status)) }
-  if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
+  let j; try{ j = JSON.parse(txt) }catch(e){ throw new Error(tm(txt.trim())||("HTTP "+r.status)) }
+  if(!r.ok) throw new Error(tm(j.error)||("HTTP "+r.status));
   return j;
 }
 
-/* ---------- segmentos ---------- */
+/* ---------- segments ---------- */
 function seg(id, cb){
   const el = $(id);
   el.addEventListener("click", e=>{
@@ -307,9 +671,9 @@ function connReq(){
     password:$("#cPass").value, encrypt:$("#cEnc").value, trust:$("#cTrust").checked, connString:$("#cStr").value};
 }
 
-/* ---------- conexão ---------- */
+/* ---------- connection ---------- */
 $("#btnConnect").onclick = async ()=>{
-  const msg = $("#connMsg"); msg.className="hint"; msg.textContent="conectando…";
+  const msg = $("#connMsg"); msg.className="hint"; msg.textContent=t("conn.connecting");
   $("#btnConnect").disabled = true;
   try{
     const c = connReq();
@@ -325,11 +689,16 @@ $("#btnConnect").onclick = async ()=>{
 };
 $("#sDb").addEventListener("change", loadTables);
 let tables = [];
+function renderTableOpts(){
+  const sel = $("#sTable"), cur = sel.value;
+  sel.innerHTML = tables.length ? tables.map((x,i)=>`<option value="${i}">${x.likely?"★ ":""}${esc(x.schema+"."+x.name)} (${t("tblRows", fN(x.rows))})</option>`).join("") : `<option value=''>${esc(t("noTables"))}</option>`;
+  if(cur) sel.value = cur;
+}
 async function loadTables(){
-  const sel = $("#sTable"); sel.disabled = true; sel.innerHTML = "<option>carregando…</option>";
+  const sel = $("#sTable"); sel.disabled = true; sel.innerHTML = `<option>${esc(t("loading"))}</option>`;
   try{
     tables = await api("/api/tables", {conn:lastConn, db:$("#sDb").value});
-    sel.innerHTML = tables.length ? tables.map((t,i)=>`<option value="${i}">${t.likely?"★ ":""}${esc(t.schema+"."+t.name)} (${fN(t.rows)} linhas)</option>`).join("") : "<option value=''>— nenhuma tabela —</option>";
+    renderTableOpts();
     sel.disabled = !tables.length;
     if(tables.length) await loadColumns();
   }catch(e){ sel.innerHTML=""; $("#anMsg").className="err"; $("#anMsg").textContent=e.message }
@@ -338,15 +707,15 @@ $("#sTable").addEventListener("change", loadColumns);
 const MAPS = {stmt:["statement","batch_text","sql_text"], name:["name","event_name","event"], duration:["duration"], cpu:["cpu_time","cpu"],
   reads:["logical_reads","reads"], physical:["physical_reads"], writes:["writes"], rows:["row_count","rows"]};
 async function loadColumns(){
-  const t = tables[+$("#sTable").value]; if(!t) return;
+  const tb = tables[+$("#sTable").value]; if(!tb) return;
   try{
-    const cols = await api("/api/columns", {conn:lastConn, db:$("#sDb").value, schema:t.schema, table:t.name});
+    const cols = await api("/api/columns", {conn:lastConn, db:$("#sDb").value, schema:tb.schema, table:tb.name});
     for(const k in MAPS){
       const sel = $("#m_"+k);
       const names = cols.map(c=>c.name);
       let pick = "";
       for(const cand of MAPS[k]){ const f = names.find(n=>n.toLowerCase()===cand); if(f){pick=f;break} }
-      sel.innerHTML = (k==="stmt"?"":"<option value=''>(nenhuma)</option>") + cols.map(c=>`<option ${c.name===pick?"selected":""} value="${esc(c.name)}">${esc(c.name)} · ${esc(c.type)}</option>`).join("");
+      sel.innerHTML = (k==="stmt"?"":`<option value='' data-i18n="none">${esc(t("none"))}</option>`) + cols.map(c=>`<option ${c.name===pick?"selected":""} value="${esc(c.name)}">${esc(c.name)} · ${esc(c.type)}</option>`).join("");
     }
   }catch(e){ $("#anMsg").className="err"; $("#anMsg").textContent=e.message }
   updateAnalyzeBtn();
@@ -358,11 +727,11 @@ function updateAnalyzeBtn(){
 }
 function sourceReq(){
   const src = segVal("#segSrc");
-  const t = tables[+$("#sTable").value] || {};
+  const tb = tables[+$("#sTable").value] || {};
   const cols = {}; for(const k in MAPS){ const v=$("#m_"+k).value; if(v) cols[k]=v }
   return {
     conn:lastConn, normalizeLiterals:$("#sNormLit").checked, unitMs: src==="table" && $("#sUnit").value==="ms",
-    source:{type:src, db:$("#sDb").value, schema:t.schema, table:t.name, cols,
+    source:{type:src, db:$("#sDb").value, schema:tb.schema, table:tb.name, cols,
       eventValue: src==="xel"? $("#sXelEvent").value : $("#sEvent").value,
       like:$("#sLike").value, where:$("#sWhere").value, top:+$("#sTop").value||0, xelPath:$("#sXel").value}
   };
@@ -383,37 +752,44 @@ async function startAnalyze(req){
 async function poll(){
   let st;
   try{ st = await api("/api/status") }catch(e){ $("#progTxt").textContent=e.message; setTimeout(poll,1000); return }
-  $("#progTxt").innerHTML = `${fN(st.read)} linhas lidas · ${fN(st.parsed)} interpretadas · ${fN(st.failed)} com falha · ${nf1.format(st.elapsedMs/1000)} s`;
+  $("#progTxt").textContent = (st.progress!=null? t("prog.file", fP(st.progress)) : "") + t("prog.line", fN(st.read), fN(st.parsed), fN(st.failed), nf1.format(st.elapsedMs/1000));
   if(st.state==="running"){ setTimeout(poll, 500); return }
   $("#progOv").classList.add("hidden");
-  if(st.state==="error"){ $("#anMsg").className="err"; $("#anMsg").textContent="Erro: "+st.error; if(!st.parsed) return }
-  await loadResults();
+  const msg = LOCAL ? $("#fMsg") : $("#anMsg");
+  if(st.state==="error"){ msg.className="err"; msg.textContent=t("err")+tm(st.error); if(!st.parsed) return }
+  try{ await loadResults() }catch(e){ msg.className="err"; msg.textContent=t("err")+e.message }
 }
 $("#btnCancel").onclick = ()=> api("/api/cancel", {});
 
-/* ---------- resultados ---------- */
+/* ---------- results ---------- */
+let hdr = null; // {label, generated, state} of the results on screen
+function renderHdr(){
+  if(!hdr || $("#vRes").classList.contains("hidden")){ $("#hdrSub").textContent = t(LOCAL ? "sub.file" : "sub.default"); return }
+  $("#hdrSub").textContent = tv(hdr.label||"") + (hdr.generated? " · "+t("sub.generated", hdr.generated) : "") + (hdr.state==="canceled"?" · "+t("sub.canceled"):"");
+}
 async function loadResults(){
   let r;
   if(STATIC){ r = STATIC } else { r = await api("/api/overview") }
   ov = r.overview; costM = ov.costMetric;
   for(const k in detailCache) delete detailCache[k];
-  $("#hdrSub").textContent = (r.label||"") + (r.generated? " · gerado em "+r.generated : "") + (r.state==="canceled"?" · (cancelado — dados parciais)":"");
-  $("#vSetup").classList.add("hidden"); $("#vRes").classList.remove("hidden");
+  hdr = {label: r.label, generated: r.generated, state: r.state};
+  $("#vSetup").classList.add("hidden"); $("#vFile").classList.add("hidden"); $("#vRes").classList.remove("hidden");
   if(!STATIC){ $("#btnNew").classList.remove("hidden"); $("#btnExport").classList.remove("hidden") }
+  renderHdr();
   renderTotals(); renderFamList(); renderAllFindings(); renderFails();
   showTab("findings");
-  if(ov.families.length) selectFamily(ov.families[0].id, false);
+  if(ov.families && ov.families.length) selectFamily(ov.families[0].id, false);
 }
 function renderTotals(){
-  const t = ov.totals, h = ov.has;
+  const tt = ov.totals, h = ov.has;
   const k = [];
-  k.push(kpi("Execuções", fN(t.count), `${fN(ov.families.length)} queries distintas`));
-  if(h[M.dur]) k.push(kpi("Duração total", fM(M.dur,t.sum[M.dur]), "média "+fM(M.dur,avg(t,M.dur))));
-  if(h[M.cpu]) k.push(kpi("CPU total", fM(M.cpu,t.sum[M.cpu]), "média "+fM(M.cpu,avg(t,M.cpu))));
-  if(h[M.reads]) k.push(kpi("Logical reads", fN(t.sum[M.reads]), "média "+fM(M.reads,avg(t,M.reads))));
-  k.push(kpi("Não interpretados", fN(ov.failed), ov.read? fP(ov.failed/ov.read)+" das linhas":""));
-  const sev3 = ov.findings.filter(f=>f.sev===3).length;
-  k.push(kpi("Achados", fN(ov.findings.length), `${sev3} de alta prioridade`));
+  k.push(kpi(t("kpi.execs"), fN(tt.count), t("kpi.distinct", fN((ov.families||[]).length))));
+  if(h[M.dur]) k.push(kpi(t("kpi.dur"), fM(M.dur,tt.sum[M.dur]), t("kpi.avg", fM(M.dur,avg(tt,M.dur)))));
+  if(h[M.cpu]) k.push(kpi(t("kpi.cpu"), fM(M.cpu,tt.sum[M.cpu]), t("kpi.avg", fM(M.cpu,avg(tt,M.cpu)))));
+  if(h[M.reads]) k.push(kpi(t("kpi.reads"), fN(tt.sum[M.reads]), t("kpi.avg", fM(M.reads,avg(tt,M.reads)))));
+  k.push(kpi(t("kpi.fails"), fN(ov.failed), ov.read? t("kpi.failsOf", fP(ov.failed/ov.read)) : ""));
+  const fs = ov.findings||[];
+  k.push(kpi(t("kpi.findings"), fN(fs.length), t("kpi.high", fs.filter(f=>f.sev===3).length)));
   $("#totKpis").innerHTML = k.join("");
 }
 function kpi(l,v,d){return `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div><div class="d">${esc(d||"")}</div></div>`}
@@ -421,17 +797,18 @@ function kpi(l,v,d){return `<div class="kpi"><div class="l">${esc(l)}</div><div 
 function famCost(f){ return costM>=0 ? f.share[costM] : f.execShare }
 function renderFamList(){
   const q = $("#famFilter").value.toLowerCase();
-  let fs = ov.families.filter(f=>!q || f.title.toLowerCase().includes(q) || (f.proc||"").toLowerCase().includes(q));
+  const all = ov.families||[];
+  let fs = all.filter(f=>!q || f.title.toLowerCase().includes(q) || (f.proc||"").toLowerCase().includes(q));
   const s = $("#famSort").value;
   fs = fs.slice().sort((a,b)=> s==="execs"? b.agg.count-a.agg.count : s==="sev"? (b.maxSev-a.maxSev)||(b.findings-a.findings) : famCost(b)-famCost(a));
-  $("#famCount").textContent = fs.length+" de "+ov.families.length;
-  const cl = costM>=0? MNAME[costM] : "execuções";
+  $("#famCount").textContent = t("fam.count", fs.length, all.length);
+  const cl = costM>=0? MNAME()[costM] : t("fam.execWord");
   $("#famList").innerHTML = fs.map(f=>`
     <div class="fam ${curFam===f.id?"on":""}" data-id="${f.id}">
       <div class="t">${esc(f.title)}</div>
-      <div class="m"><span class="dot s${f.maxSev}"></span><span>${fN(f.agg.count)} exec · ${fP(f.execShare)}</span><span>${fP(famCost(f))} ${cl}</span><span>${f.findings} achado(s)</span></div>
+      <div class="m"><span class="dot s${f.maxSev}"></span><span>${esc(t("fam.execs", fN(f.agg.count), fP(f.execShare)))}</span><span>${fP(famCost(f))} ${esc(cl)}</span><span>${esc(t("fam.findings", f.findings))}</span></div>
       <div class="share"><b style="width:${(famCost(f)*100).toFixed(1)}%"></b></div>
-    </div>`).join("") || `<div class="empty">nada encontrado</div>`;
+    </div>`).join("") || `<div class="empty">${esc(t("fam.nothing"))}</div>`;
 }
 $("#famFilter").addEventListener("input", renderFamList);
 $("#famSort").addEventListener("change", renderFamList);
@@ -446,29 +823,50 @@ function showTab(v){
 $("#mainTabs").addEventListener("click", e=>{ const b=e.target.closest("button"); if(b) showTab(b.dataset.v) });
 
 function findingHTML(f, withFam){
-  const fam = withFam ? ov.families.find(x=>x.id===f.family) : null;
+  const fam = withFam ? (ov.families||[]).find(x=>x.id===f.family) : null;
+  const x = findingText(f);
   return `<div class="find s${f.sev}">
-    <div class="tt">${esc(f.title)}</div>
-    ${f.detail?`<div class="dd">${esc(f.detail)}</div>`:""}
+    <div class="tt">${esc(x.t)}</div>
+    ${x.d?`<div class="dd">${esc(x.d)}</div>`:""}
     ${f.code?`<code class="code">${esc(f.code)}</code>`:""}
-    ${f.suggestion?`<div class="sg">${esc(f.suggestion)}</div>`:""}
-    ${fam?`<div class="fm"><button class="link" data-fam="${fam.id}">${esc(fam.title.slice(0,110))}</button> · ${fN(fam.agg.count)} exec · ${fP(famCost(fam))} do ${costM>=0?MNAME[costM]:"total"}</div>`:""}
+    ${x.s?`<div class="sg"><b>${esc(t("find.sugg"))}</b> ${esc(x.s)}</div>`:""}
+    ${fam?`<div class="fm"><button class="link" data-fam="${fam.id}">${esc(fam.title.slice(0,110))}</button> · ${esc(t("find.fam", fN(fam.agg.count), fP(famCost(fam)), costM>=0?MNAME()[costM]:t("find.total")))}</div>`:""}
   </div>`;
 }
 function renderAllFindings(){
   const el = $("#tFindings");
-  if(!ov.findings.length){ el.innerHTML = `<div class="card empty">Nenhum achado. Veja os detalhes de cada query na lista ao lado.</div>`; return }
-  el.innerHTML = `<p class="legend"><span class="dot s3"></span> alta &nbsp; <span class="dot s2"></span> média &nbsp; <span class="dot s1"></span> informativo — ordenado por prioridade e peso da query</p>` + ov.findings.map(f=>findingHTML(f,true)).join("");
+  const fi = ov.fileInfo;
+  const warn = fi && fi.truncated ? `<div class="find s3"><div class="tt">${esc(t("trunc.title", fN(fi.truncated)))}</div>
+    <div class="dd">${esc(t("trunc.detail"))}</div></div>` : "";
+  const fs = ov.findings||[];
+  if(!fs.length){ el.innerHTML = warn + `<div class="card empty">${esc(t("find.none"))}</div>`; return }
+  el.innerHTML = warn + `<p class="legend">${t("find.legend")}</p>` + fs.map(f=>findingHTML(f,true)).join("");
 }
 $("#tFindings").addEventListener("click", e=>{ const b=e.target.closest("[data-fam]"); if(b) selectFamily(+b.dataset.fam, true) });
 
 function renderFails(){
   const el = $("#tFails");
   const kinds = Object.entries(ov.failKinds||{}).sort((a,b)=>b[1]-a[1]);
-  if(!ov.failed){ el.innerHTML = `<div class="card empty">Todas as linhas foram interpretadas.</div>`; return }
-  el.innerHTML = `<div class="card"><h2>${fN(ov.failed)} linha(s) não interpretada(s)</h2>
-    <table><tr><th>Motivo</th><th class="n">Linhas</th></tr>${kinds.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fN(v)}</td></tr>`).join("")}</table>
-    <h3>Exemplos</h3>${(ov.fails||[]).map(f=>`<div class="find s1"><div class="tt">${esc(f.error)}</div><code class="code">${esc(f.stmt)}</code></div>`).join("")}</div>`;
+  const fi = ov.fileInfo;
+  let file = "";
+  if(fi){
+    const ign = Object.entries(fi.ignored||{}).sort((a,b)=>b[1]-a[1]);
+    const r = (k,v)=>`<tr><td>${esc(k)}</td><td class="n">${v}</td></tr>`;
+    file = `<div class="card" style="margin-top:14px"><h2>${esc(t("fi.title"))}</h2><table>
+      ${r(t("fi.enc"), esc(fi.encoding))}
+      ${r(t("fi.lines"), fN(fi.lines))}
+      ${r(t("fi.header"), esc(t(fi.header?"yes":"no")))}
+      ${fi.tsMin?r(t("fi.period"), esc(t("fi.periodVal", fi.tsMin.replace("T"," "), fi.tsMax.replace("T"," ")))):""}
+      ${ign.map(([k,v])=>r(t("fi.ignored", k), fN(v))).join("")}
+      ${fi.filtered?r(t("fi.filtered"), fN(fi.filtered)):""}
+      ${fi.badFormat?r(t("fi.bad"), fN(fi.badFormat)):""}
+      ${fi.truncated?r(t("fi.cut"), fN(fi.truncated)):""}
+    </table></div>`;
+  }
+  if(!ov.failed){ el.innerHTML = `<div class="card empty">${esc(t("fails.none"))}</div>` + file; return }
+  el.innerHTML = `<div class="card"><h2>${esc(t("fails.title", fN(ov.failed)))}</h2>
+    <table><tr><th>${esc(t("fails.reason"))}</th><th class="n">${esc(t("fails.rows"))}</th></tr>${kinds.map(([k,v])=>`<tr><td>${esc(tm(k))}</td><td class="n">${fN(v)}</td></tr>`).join("")}</table>
+    <h3>${esc(t("fails.examples"))}</h3>${(ov.fails||[]).map(f=>`<div class="find s1"><div class="tt">${esc(tm(f.error))}</div><code class="code">${esc(f.stmt)}</code></div>`).join("")}</div>` + file;
 }
 
 async function getDetail(id){
@@ -477,87 +875,92 @@ async function getDetail(id){
   detailCache[id] = d; return d;
 }
 async function selectFamily(id, switchTab){
-  curFam = id; renderFamList();
+  curFam = id; lastCombo = null; renderFamList();
   if(switchTab) showTab("family");
   const el = $("#tFamily");
-  el.innerHTML = `<div class="empty">carregando…</div>`;
+  el.innerHTML = `<div class="empty">${esc(t("loading"))}</div>`;
   try{ curDetail = await getDetail(id) }catch(e){ el.innerHTML = `<div class="err">${esc(e.message)}</div>`; return }
   renderFamily();
 }
 
 function pbar(p, cost){ return `<div class="pbar"><div class="b"><i class="${cost?"c":""}" style="width:${Math.min(100,p*100).toFixed(1)}%"></i></div><span>${fP(p)}</span></div>` }
+const sampleBtn = (ix, big) => !STATIC ? `<button class="btn sm${big?" nf":""}" data-sample="${ix}">${esc(t(big?"sample.btn":"sample.btnSm"))}</button>` : "";
 
 function renderFamily(){
-  const d = curDetail, s = d.summary, a = s.agg, h = ov.has;
-  const k = [kpi("Execuções", fN(a.count), fP(s.execShare)+" do total")];
-  for(const m of [M.dur,M.cpu,M.reads]) if(h[m]) k.push(kpi(MNAME[m]+" média", fM(m,avg(a,m)), fP(s.share[m])+" do total · máx "+fM(m,a.max[m])));
-  if(h[M.rows]) k.push(kpi("linhas média", fM(M.rows,avg(a,M.rows)), ""));
+  const d = curDetail, s = d.summary, a = s.agg, h = ov.has, MN = MNAME();
+  const k = [kpi(t("kpi.execs"), fN(a.count), t("kpi.ofTotal", fP(s.execShare)))];
+  for(const m of [M.dur,M.cpu,M.reads]) if(h[m]) k.push(kpi(t("kpi.mAvg", MN[m]), fM(m,avg(a,m)), t("kpi.maxOf", fP(s.share[m]), fM(m,a.max[m]))));
+  if(h[M.rows]) k.push(kpi(t("kpi.rowsAvg"), fM(M.rows,avg(a,M.rows)), ""));
   const cm = costM;
+  const decls = d.decls||[], pats = d.patterns||[], params = d.params||[], fnd = d.findings||[];
   let html = `<div class="card" style="margin-bottom:14px">
-    <div class="row"><h2 class="nf" style="margin:0">${s.kind==="proc"?"Procedure "+esc(s.proc):"Query via "+esc(s.kind)}</h2><div></div>
-      ${!STATIC?`<button class="btn sm nf" data-sample="${a.sample}">Exemplo</button>`:""}</div>
+    <div class="row"><h2 class="nf" style="margin:0">${esc(s.kind==="proc"? t("fam.proc", s.proc) : t("fam.via", s.kind))}</h2><div></div>
+      ${sampleBtn(a.sample, true)}</div>
     <div class="kpis" style="margin-top:12px">${k.join("")}</div>
-    <details><summary class="hint" style="cursor:pointer">SQL de exemplo${d.decls&&d.decls.length?` · ${d.decls.length} declaração(ões) de parâmetros`:""}</summary>
+    <details><summary class="hint" style="cursor:pointer">${esc(t("fam.sql"))}${decls.length? esc(t("fam.declsN", decls.length)) : ""}</summary>
       <pre class="sql" style="margin-top:8px">${esc(d.sql||d.norm)}</pre>
-      ${d.decls&&d.decls.length?`<h3>Declarações de parâmetros</h3><table><tr><th>Declaração</th><th class="n">Execuções</th></tr>${d.decls.slice(0,10).map(x=>`<tr><td class="v">${esc(x.k)}</td><td class="n">${fN(x.v)}</td></tr>`).join("")}</table>`:""}
+      ${decls.length?`<h3>${esc(t("fam.declsT"))}</h3><table><tr><th>${esc(t("fam.decl"))}</th><th class="n">${esc(t("col.execs"))}</th></tr>${decls.slice(0,10).map(x=>`<tr><td class="v">${esc(x.k)}</td><td class="n">${fN(x.v)}</td></tr>`).join("")}</table>`:""}
     </details></div>`;
 
-  if(d.findings && d.findings.length) html += `<div class="card" style="margin-bottom:14px"><h2>Achados</h2>${d.findings.map(f=>findingHTML(f,false)).join("")}</div>`;
+  if(fnd.length) html += `<div class="card" style="margin-bottom:14px"><h2>${esc(t("fam.findingsT"))}</h2>${fnd.map(f=>findingHTML(f,false)).join("")}</div>`;
 
-  if(d.patterns && d.patterns.length){
-    html += `<div class="card" style="margin-bottom:14px"><h2>Predicados catch-all (OR / ISNULL)</h2>
-    <p class="legend">% de execuções em que a condição do lado do parâmetro é verdadeira — quando verdadeira, o outro lado do OR não filtra nada.</p>
-    <div class="scroll"><table><tr><th>Condição</th><th>Verdadeira em</th>${cm>=0?`<th class="n">${MNAME[cm]} méd. (V)</th><th class="n">${MNAME[cm]} méd. (F)</th>`:""}<th>Trecho</th></tr>
-    ${d.patterns.map(p=>`<tr><td class="v">${esc(p.cond)}</td><td>${pbar(p.truePct)}<span class="hint">${fN(p.true.count)} de ${fN(p.evaluated)}</span></td>
+  if(pats.length){
+    html += `<div class="card" style="margin-bottom:14px"><h2>${esc(t("pat.title"))}</h2>
+    <p class="legend">${esc(t("pat.legend"))}</p>
+    <div class="scroll"><table><tr><th>${esc(t("pat.cond"))}</th><th>${esc(t("pat.true"))}</th>${cm>=0?`<th class="n">${esc(t("pat.avgT", MN[cm]))}</th><th class="n">${esc(t("pat.avgF", MN[cm]))}</th>`:""}<th>${esc(t("pat.snip"))}</th></tr>
+    ${pats.map(p=>`<tr><td class="v">${esc(p.cond)}</td><td>${pbar(p.truePct)}<span class="hint">${esc(t("pat.of", fN(p.true.count), fN(p.evaluated)))}</span></td>
       ${cm>=0?`<td class="n">${p.true.count?fM(cm,avg(p.true,cm)):"–"}</td><td class="n">${p.false.count?fM(cm,avg(p.false,cm)):"–"}</td>`:""}
       <td class="v" style="max-width:520px">${esc(p.snippet)}</td></tr>`).join("")}</table></div></div>`;
   }
 
   if(d.shapes && d.shapes.params && d.shapes.params.length){
     const sh = d.shapes;
-    html += `<div class="card" style="margin-bottom:14px"><h2>Formatos de chamada</h2>
-    <p class="legend">Cada linha é uma combinação de catch-alls: <span class="badge c-alta">filtra</span> = o filtro foi aplicado; <span class="badge">pass-through</span> = a condição do parâmetro era verdadeira e o OR não filtrou nada.</p>
-    <div class="scroll"><table><tr>${sh.params.map(p=>`<th><code>${esc(p)}</code></th>`).join("")}<th class="n">Execuções</th><th>% execuções</th>${cm>=0?`<th>% custo</th><th class="n">${MNAME[cm]} méd.</th>`:""}<th></th></tr>
-    ${sh.rows.map(r=>`<tr>${r.values.map(v=>`<td><span class="badge ${v==="filtra"?"c-alta":""}">${esc(v)}</span></td>`).join("")}
+    html += `<div class="card" style="margin-bottom:14px"><h2>${esc(t("shp.title"))}</h2>
+    <p class="legend">${t("shp.legend")}</p>
+    <div class="scroll"><table><tr>${sh.params.map(p=>`<th><code>${esc(p)}</code></th>`).join("")}<th class="n">${esc(t("col.execs"))}</th><th>${esc(t("col.pctExecs"))}</th>${cm>=0?`<th>${esc(t("col.pctCost"))}</th><th class="n">${esc(t("col.mAvg", MN[cm]))}</th>`:""}<th></th></tr>
+    ${sh.rows.map(r=>`<tr>${r.values.map(v=>`<td><span class="badge ${v==="filter"?"c-high":""}">${esc(tv(v))}</span></td>`).join("")}
       <td class="n">${fN(r.agg.count)}</td><td>${pbar(r.pct)}</td>${cm>=0?`<td>${pbar(r.share[cm],true)}</td><td class="n">${fM(cm,avg(r.agg,cm))}</td>`:""}
-      <td>${!STATIC?`<button class="btn sm" data-sample="${r.agg.sample}">exemplo</button>`:""}</td></tr>`).join("")}</table></div></div>`;
+      <td>${sampleBtn(r.agg.sample)}</td></tr>`).join("")}</table></div></div>`;
   }
 
-  // parâmetros
-  html += `<div class="card" style="margin-bottom:14px"><h2>Parâmetros</h2>
-  <p class="legend">Clique numa linha para ver a distribuição de valores.${cm>=0?` "Custo" = participação no ${MNAME[cm]} desta query.`:""}</p>
-  <div class="scroll"><table id="ptab"><tr><th>Parâmetro</th><th>Tipo</th><th>Cardinalidade</th><th class="n">Distintos</th><th>Valor mais comum</th><th>% execuções</th><th class="n">% NULL</th></tr>
-  ${d.params.map((p,i)=>{
-    const t = p.top[0]||{value:"",pct:0};
-    return `<tr class="click" data-p="${i}"><td class="v">${esc(p.name)} ${p.pseudo?`<span class="badge ps">${p.pseudo==="in-values"?"lista IN":"tam. IN"}</span>`:""}</td>
-      <td class="v">${esc(p.type)}${p.types&&p.types.length>1?` <span class="badge" title="${esc(p.types.map(x=>x.k+": "+x.v).join("\n"))}">+${p.types.length-1} tipos</span>`:""}</td>
-      <td><span class="badge c-${p.card}">${p.card}</span></td><td class="n">${fN(p.distinct)}${p.overflow?"+":""}</td>
-      <td class="v">${esc(t.value)}</td><td>${pbar(t.pct)}</td><td class="n">${p.nullPct?fP(p.nullPct):"–"}</td></tr>
+  // parameters
+  html += `<div class="card" style="margin-bottom:14px"><h2>${esc(t("par.title"))}</h2>
+  <p class="legend">${esc(t("par.legend"))}${cm>=0? esc(t("par.legendCost", MN[cm])) : ""}</p>
+  <div class="scroll"><table id="ptab"><tr><th>${esc(t("par.name"))}</th><th>${esc(t("par.type"))}</th><th>${esc(t("par.card"))}</th><th class="n">${esc(t("par.distinct"))}</th><th>${esc(t("par.top"))}</th><th>${esc(t("col.pctExecs"))}</th><th class="n">% NULL</th></tr>
+  ${params.map((p,i)=>{
+    const top = (p.top||[])[0]||{value:"",pct:0};
+    const types = p.types||[];
+    return `<tr class="click" data-p="${i}"><td class="v">${esc(tv(p.name))} ${p.pseudo?`<span class="badge ps">${esc(t(p.pseudo==="in-values"?"par.inList":"par.inSize"))}</span>`:""}</td>
+      <td class="v">${esc(p.type)}${types.length>1?` <span class="badge" title="${esc(types.map(x=>x.k+": "+x.v).join("\n"))}">${esc(t("par.types", types.length-1))}</span>`:""}</td>
+      <td><span class="badge c-${p.card}">${esc(t("card."+p.card))}</span></td><td class="n">${fN(p.distinct)}${p.overflow?"+":""}</td>
+      <td class="v">${esc(tv(top.value))}</td><td>${pbar(top.pct)}</td><td class="n">${p.nullPct?fP(p.nullPct):"–"}</td></tr>
       <tr class="sub-t hidden" id="pd${i}"><td colspan="7"></td></tr>`}).join("")}
   </table></div></div>`;
 
-  // combinações
-  html += `<div class="card"><h2>Combinações de valores</h2>
-    <p class="legend">Escolha os parâmetros que formam a combinação. Parâmetros de alta cardinalidade entram por <b>classe</b> (NULL, 0, '', data nula, (valor)…).${STATIC?" No relatório exportado a seleção é fixa.":""}</p>
-    <div class="chips" id="chips">${d.params.filter(p=>p.card!=="constante").map(p=>`<span class="chip ${d.combos.indexes.includes(p.index)?"on":""}" data-i="${p.index}">${esc(p.name)}</span>`).join("")}</div>
+  // combinations
+  const combo = lastCombo && lastCombo.fam === curFam ? lastCombo.c : d.combos;
+  const onIdx = (combo && combo.indexes) || [];
+  html += `<div class="card"><h2>${esc(t("cmb.title"))}</h2>
+    <p class="legend">${t("cmb.legend")}${STATIC? esc(t("cmb.static")) : ""}</p>
+    <div class="chips" id="chips">${params.filter(p=>p.card!=="constant").map(p=>`<span class="chip ${onIdx.includes(p.index)?"on":""}" data-i="${p.index}">${esc(tv(p.name))}</span>`).join("")}</div>
     <div id="comboTab"></div></div>`;
 
   $("#tFamily").innerHTML = html;
-  renderCombos(d.combos);
+  renderCombos(combo);
 }
 
-function valueRows(list, a){
+function valueRows(list){
   const cm = costM;
-  return list.map(v=>`<tr><td class="v">${esc(v.value)}</td><td class="n">${fN(v.agg.count)}</td><td>${pbar(v.pct)}</td>
+  return list.map(v=>`<tr><td class="v">${esc(tv(v.value))}</td><td class="n">${fN(v.agg.count)}</td><td>${pbar(v.pct)}</td>
     ${cm>=0?`<td>${pbar(v.share[cm],true)}</td><td class="n">${fM(cm,avg(v.agg,cm))}</td>`:""}
-    ${!STATIC?`<td><button class="btn sm" data-sample="${v.agg.sample}">exemplo</button></td>`:"<td></td>"}</tr>`).join("");
+    <td>${sampleBtn(v.agg.sample)}</td></tr>`).join("");
 }
 function valueTable(p){
   const cm = costM;
-  const head = `<tr><th>Valor</th><th class="n">Execuções</th><th>% execuções</th>${cm>=0?`<th>% custo</th><th class="n">${MNAME[cm]} méd.</th>`:""}<th></th></tr>`;
+  const head = `<tr><th>${esc(t("val.value"))}</th><th class="n">${esc(t("col.execs"))}</th><th>${esc(t("col.pctExecs"))}</th>${cm>=0?`<th>${esc(t("col.pctCost"))}</th><th class="n">${esc(t("col.mAvg", MNAME()[cm]))}</th>`:""}<th></th></tr>`;
   let h = "";
-  if(p.classes && p.classes.length) h += `<h3 style="margin-top:4px">Por classe</h3><table>${head}${valueRows(p.classes)}</table><h3>Valores mais frequentes</h3>`;
-  h += `<table>${head}${valueRows(p.top)}${p.others?`<tr><td class="hint">(demais valores)</td><td class="n">${fN(p.others)}</td><td colspan="4"></td></tr>`:""}</table>`;
+  if(p.classes && p.classes.length) h += `<h3 style="margin-top:4px">${esc(t("val.byClass"))}</h3><table>${head}${valueRows(p.classes)}</table><h3>${esc(t("val.top"))}</h3>`;
+  h += `<table>${head}${valueRows(p.top||[])}${p.others?`<tr><td class="hint">${esc(t("val.others"))}</td><td class="n">${fN(p.others)}</td><td colspan="4"></td></tr>`:""}</table>`;
   return h;
 }
 $("#tFamily").addEventListener("click", async e=>{
@@ -574,27 +977,27 @@ $("#tFamily").addEventListener("click", async e=>{
   if(c && !STATIC){
     c.classList.toggle("on");
     const idx = $$("#chips .chip.on").map(x=>+x.dataset.i);
-    $("#comboTab").innerHTML = `<div class="empty">calculando…</div>`;
-    try{ renderCombos(await api("/api/combos", {id:curFam, indexes:idx})) }catch(err){ $("#comboTab").innerHTML=`<div class="err">${esc(err.message)}</div>` }
+    $("#comboTab").innerHTML = `<div class="empty">${esc(t("cmb.computing"))}</div>`;
+    try{ const r = await api("/api/combos", {id:curFam, indexes:idx}); lastCombo = {fam:curFam, c:r}; renderCombos(r) }
+    catch(err){ $("#comboTab").innerHTML=`<div class="err">${esc(err.message)}</div>` }
   }
 });
 let lastCombo = null;
 function renderCombos(c){
-  lastCombo = c;
   const cm = costM, el = $("#comboTab");
-  if(!c.params || !c.params.length){ el.innerHTML = `<div class="empty">Selecione ao menos um parâmetro.</div>`; return }
-  el.innerHTML = `<div class="row" style="margin-bottom:8px"><span class="hint">${fN(c.distinct)} combinação(ões) distinta(s)${c.rows.length<c.distinct?` · mostrando as ${c.rows.length} mais frequentes`:""}</span>
-      <button class="btn sm nf" id="btnCsv">Exportar CSV</button></div>
-    <div class="scroll"><table><tr>${c.params.map((p,i)=>`<th>${esc(p)}${c.modes[i]==="classe"?' <span class="badge c-alta">classe</span>':""}</th>`).join("")}
-    <th class="n">Execuções</th><th>% execuções</th>${cm>=0?`<th>% custo</th><th class="n">${MNAME[cm]} méd.</th>`:""}<th></th></tr>
-    ${c.rows.map(r=>`<tr>${r.values.map(v=>`<td class="v">${esc(v)}</td>`).join("")}<td class="n">${fN(r.agg.count)}</td><td>${pbar(r.pct)}</td>
+  if(!c || !c.params || !c.params.length){ el.innerHTML = `<div class="empty">${esc(t("cmb.pick"))}</div>`; return }
+  el.innerHTML = `<div class="row" style="margin-bottom:8px"><span class="hint">${esc(t("cmb.count", fN(c.distinct)))}${c.rows.length<c.distinct? esc(t("cmb.showing", c.rows.length)) : ""}</span>
+      <button class="btn sm nf" id="btnCsv">${esc(t("cmb.csv"))}</button></div>
+    <div class="scroll"><table><tr>${c.params.map((p,i)=>`<th>${esc(tv(p))}${c.modes[i]==="class"?` <span class="badge c-high">${esc(t("cmb.class"))}</span>`:""}</th>`).join("")}
+    <th class="n">${esc(t("col.execs"))}</th><th>${esc(t("col.pctExecs"))}</th>${cm>=0?`<th>${esc(t("col.pctCost"))}</th><th class="n">${esc(t("col.mAvg", MNAME()[cm]))}</th>`:""}<th></th></tr>
+    ${c.rows.map(r=>`<tr>${r.values.map(v=>`<td class="v">${esc(tv(v))}</td>`).join("")}<td class="n">${fN(r.agg.count)}</td><td>${pbar(r.pct)}</td>
       ${cm>=0?`<td>${pbar(r.share[cm],true)}</td><td class="n">${fM(cm,avg(r.agg,cm))}</td>`:""}
-      <td>${!STATIC?`<button class="btn sm" data-sample="${r.agg.sample}">exemplo</button>`:""}</td></tr>`).join("")}</table></div>`;
+      <td>${sampleBtn(r.agg.sample)}</td></tr>`).join("")}</table></div>`;
   $("#btnCsv").onclick = ()=>{
     const q = v => '"'+String(v).replace(/"/g,'""')+'"';
-    const hdr = [...c.params, "execucoes","pct_execucoes", ...(cm>=0?["pct_custo","custo_medio"]:[])];
-    const lines = [hdr.map(q).join(";")].concat(c.rows.map(r=>[...r.values, r.agg.count, (r.pct*100).toFixed(2), ...(cm>=0?[(r.share[cm]*100).toFixed(2), avg(r.agg,cm).toFixed(1)]:[])].map(q).join(";")));
-    download("combinacoes.csv", "\ufeff"+lines.join("\r\n"), "text/csv");
+    const hdrRow = [...c.params, "executions","pct_executions", ...(cm>=0?["pct_cost","avg_cost"]:[])];
+    const lines = [hdrRow.map(q).join(";")].concat(c.rows.map(r=>[...r.values, r.agg.count, (r.pct*100).toFixed(2), ...(cm>=0?[(r.share[cm]*100).toFixed(2), avg(r.agg,cm).toFixed(1)]:[])].map(q).join(";")));
+    download("combinations.csv", String.fromCharCode(0xFEFF)+lines.join("\r\n"), "text/csv");
   };
 }
 function download(name, text, type){
@@ -603,36 +1006,208 @@ function download(name, text, type){
   setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
 }
 
-/* ---------- exemplo ---------- */
+/* ---------- sample ---------- */
 let sampleData = null;
 async function openSample(ix){
-  $("#sampleTxt").textContent = "carregando…"; $("#sampleOv").classList.remove("hidden");
+  $("#sampleTxt").textContent = t("loading"); $("#sampleOv").classList.remove("hidden");
   try{ sampleData = await api("/api/sample?exec="+ix); showSample() }catch(e){ $("#sampleTxt").textContent = e.message }
 }
-function showSample(){ $("#sampleTxt").textContent = sampleData ? sampleData[segVal("#segSample")] : "" }
+function showSample(){
+  if(!sampleData){ $("#sampleTxt").textContent = ""; return }
+  let s = sampleData[segVal("#segSample")] || "";
+  if(segVal("#segSample")==="script") s = s.replace(/^-- Generated by ParamLens from a real execution/, t("script.header"));
+  $("#sampleTxt").textContent = s;
+}
 seg("#segSample", showSample);
 $("#btnCloseSample").onclick = ()=> $("#sampleOv").classList.add("hidden");
 $("#sampleOv").addEventListener("click", e=>{ if(e.target.id==="sampleOv") $("#sampleOv").classList.add("hidden") });
-$("#btnCopy").onclick = async ()=>{
-  const t = $("#sampleTxt").textContent;
-  try{ await navigator.clipboard.writeText(t) }catch(e){ const r=document.createRange(); r.selectNodeContents($("#sampleTxt")); getSelection().removeAllRanges(); getSelection().addRange(r); document.execCommand("copy") }
-  $("#btnCopy").textContent="Copiado ✓"; setTimeout(()=>$("#btnCopy").textContent="Copiar",1200);
-};
+async function copyText(btn, el){
+  const txt = el.textContent;
+  try{ await navigator.clipboard.writeText(txt) }catch(e){ const r=document.createRange(); r.selectNodeContents(el); getSelection().removeAllRanges(); getSelection().addRange(r); document.execCommand("copy") }
+  btn.textContent = t("copied"); setTimeout(()=> btn.textContent = t("copy"), 1200);
+}
+$("#btnCopy").onclick = ()=> copyText($("#btnCopy"), $("#sampleTxt"));
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") $("#sampleOv").classList.add("hidden") });
 
-/* ---------- topo ---------- */
-$("#btnNew").onclick = ()=>{ $("#vRes").classList.add("hidden"); $("#vSetup").classList.remove("hidden"); $("#btnNew").classList.add("hidden"); $("#btnExport").classList.add("hidden"); $("#hdrSub").textContent="perfil de parâmetros do rpc_completed" };
-$("#btnExport").onclick = ()=>{ location.href = "/api/export?t="+encodeURIComponent(TOKEN) };
+/* ---------- top bar ---------- */
+function showSetup(){
+  $("#vRes").classList.add("hidden");
+  $("#vSetup").classList.toggle("hidden", LOCAL);
+  $("#vFile").classList.toggle("hidden", !LOCAL);
+  $("#btnNew").classList.add("hidden"); $("#btnExport").classList.add("hidden");
+  renderHdr();
+}
+$("#btnNew").onclick = showSetup;
+$("#btnExport").onclick = ()=>{
+  if(LOCAL){ try{ exportLocal() }catch(e){ alert(t("exportFail")+e.message) } return }
+  location.href = "/api/export?t="+encodeURIComponent(TOKEN);
+};
 $("#btnQuit").onclick = async ()=>{
-  if(!confirm("Encerrar o ParamLens?")) return;
-  try{ await api("/api/quit", {}) }catch(e){}
-  document.body.innerHTML = `<div class="empty" style="padding:80px">ParamLens encerrado. Pode fechar esta aba.</div>`;
+  if(!confirm(t("quit.confirm"))) return;
+  try{ LOCAL=false; await api("/api/quit", {}) }catch(e){}
+  document.body.innerHTML = `<div class="empty" style="padding:80px">${esc(t("quit.done"))}</div>`;
+};
+$("#btnToFile").onclick = ()=>{ LOCAL = true; $("#fBackSrv").classList.remove("hidden"); showSetup() };
+$("#btnToSrv").onclick = ()=>{ LOCAL = false; showSetup() };
+
+/* ---------- file mode: analysis in this browser ---------- */
+const LJ = {state:"idle", eng:null, info:null, file:null, label:"", err:"", cancel:false, t0:0, t1:0};
+let pendingFile = null;
+
+async function localApi(path, body){
+  const u = new URL(path, "http://local/"), q = u.searchParams;
+  const need = ()=>{ if(!LJ.eng || LJ.state==="running" || LJ.state==="idle") throw new Error(tm("no finished analysis")); return LJ.eng };
+  switch(u.pathname){
+    case "/api/status": {
+      if(LJ.state==="idle") return {state:"idle"};
+      const e = LJ.eng, i = LJ.info;
+      return {state:LJ.state, error:LJ.err, read:e?e.read:0, parsed:e?e.parsed:0, failed:e?e.failed:0,
+        elapsedMs:(LJ.t1||Date.now())-LJ.t0, label:LJ.label, progress: i&&i.size? Math.min(1,i.bytesRead/i.size) : 0};
+    }
+    case "/api/cancel": LJ.cancel = true; return {ok:"1"};
+    case "/api/overview": { const o = need().overview(); o.fileInfo = fileInfoOut(); return {overview:o, label:LJ.label, state:LJ.state} }
+    case "/api/family": { const d = need().detail(+q.get("id")); if(!d) throw new Error(tm("query not found")); return d }
+    case "/api/combos": { const c = need().combos(body.id, body.indexes); if(!c) throw new Error(tm("query not found")); return c }
+    case "/api/sample": {
+      const ref = need().execRef(+q.get("exec")); if(!ref) throw new Error(tm("execution not found"));
+      const s = await ENGINE.readStatementAt(LJ.file, LJ.info.encInfo, ref.off, ref.len);
+      return {statement:s, script:ENGINE.testScript(s)};
+    }
+  }
+  throw new Error(tm("not available in file mode"));
+}
+function fileInfoOut(){ const i = Object.assign({}, LJ.info); delete i.encInfo; return i }
+
+function setFile(f){
+  pendingFile = f || null;
+  $("#fName").textContent = f ? `${f.name} · ${fileSize(f.size)}` : "";
+  $("#fMsg").textContent = "";
+  $("#btnFileAnalyze").disabled = !f;
+}
+function fileSize(n){ return n>=1<<30? nf1.format(n/(1<<30))+" GB" : n>=1<<20? nf1.format(n/(1<<20))+" MB" : nf0.format(Math.ceil(n/1024))+" KB" }
+$("#fFile").addEventListener("change", e=> setFile(e.target.files[0]));
+const drop = $("#drop");
+drop.addEventListener("dragover", e=>{ e.preventDefault(); drop.classList.add("over") });
+drop.addEventListener("dragleave", ()=> drop.classList.remove("over"));
+drop.addEventListener("drop", e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove("over"); if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]) });
+// dropping the file outside the area must not navigate away from the page
+window.addEventListener("dragover", e=> e.preventDefault());
+window.addEventListener("drop", e=>{ e.preventDefault(); if(LOCAL && e.dataTransfer.files[0] && !$("#vFile").classList.contains("hidden")) setFile(e.dataTransfer.files[0]) });
+
+$("#btnFileAnalyze").onclick = async ()=>{
+  const msg = $("#fMsg"); msg.className = "hint"; msg.textContent = "";
+  if(!ENGINE){ msg.className="err"; msg.textContent=t("file.noEngine"); return }
+  if(!pendingFile || LJ.state==="running") return;
+  const ev = $("#fEvent").value.trim() || "rpc_completed";
+  Object.assign(LJ, {state:"running", eng:null, info:null, file:pendingFile, label:pendingFile.name, err:"", cancel:false, t0:Date.now(), t1:0});
+  $("#progOv").classList.remove("hidden");
+  setTimeout(poll, 200);
+  try{
+    const r = await ENGINE.analyzeFile(pendingFile, {
+      normalizeLiterals:$("#fNormLit").checked, unitMs:$("#fUnit").value==="ms", eventName:ev, like:$("#fLike").value,
+      onProgress:(info, eng)=>{ LJ.info = info; LJ.eng = eng }, isCanceled:()=>LJ.cancel });
+    LJ.eng = r.engine; LJ.info = r.info;
+    if(r.canceled) LJ.state = "canceled";
+    else if(!r.engine.read){
+      const ign = Object.entries(r.info.ignored).map(([k,v])=>t("file.nOf", fN(v), k)).join(", ");
+      LJ.state = "error";
+      LJ.err = t("file.noEvent", ev) + (ign? t("file.ignored", ign) : "") + (r.info.filtered? t("file.filtered", fN(r.info.filtered)) : "") + (!r.info.lines? t("file.empty") : "");
+    } else LJ.state = "done";
+    if(LJ.info.tsMin) LJ.label += " · " + LJ.info.tsMin.replace("T"," ").slice(0,16) + " – " + LJ.info.tsMax.replace("T"," ").slice(0,16);
+  }catch(e){ LJ.state = "error"; LJ.err = e.message }
+  LJ.t1 = Date.now();
 };
 
-/* ---------- início ---------- */
+// static report: this very page with the analysis JSON at the marker
+function exportLocal(){
+  const o = LJ.eng.overview(); o.fileInfo = fileInfoOut();
+  const details = {};
+  for(const f of o.families) details[f.id] = LJ.eng.detail(f.id);
+  const now = new Date(), p2 = n=>String(n).padStart(2,"0");
+  const stamp = `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
+  const data = JSON.stringify({overview:o, details, label:LJ.label, generated:stamp})
+    .replace(/[<>&]/g, c=> "\\u00" + c.charCodeAt(0).toString(16));
+  const marker = "<!-" + "-STATIC-DATA-->";
+  if(PAGE_HTML.indexOf(marker) < 0) throw new Error("report marker not found");
+  const html = PAGE_HTML.replace(marker, ()=> '<script id="static-data" type="application/json">' + data + "</" + "script>");
+  download("paramlens-" + stamp.replace(/[-: ]/g,"").replace(/^(\d{8})/,"$1-") + ".html", html, "text/html");
+}
+
+/* ---------- how to export: query and commands ---------- */
+const EXP_COLS = [["ev","col.ev","name"],["ts","col.ts","timestamp_utc"],["duration","","duration"],["cpu","","cpu_time"],
+  ["reads","","logical_reads"],["physical","","physical_reads"],["writes","","writes"],["rows","","row_count"],["stmt","","statement"]];
+const EXP_LABEL = {duration:"duration", cpu:"cpu_time", reads:"logical_reads", physical:"physical_reads", writes:"writes", rows:"row_count", stmt:"Statement *"};
+function renderExpCols(){
+  const vals = {}; $$("#expCols input").forEach(i=> vals[i.id] = i.value);
+  $("#expCols").innerHTML = EXP_COLS.map(([k,l,d])=>`<label class="f"><span>${esc(t("exp.col", l? t(l) : EXP_LABEL[k]))}</span><input type="text" id="e_${k}" value="${esc(vals["e_"+k]!==undefined? vals["e_"+k] : d)}"></label>`).join("");
+}
+const qn = s => "[" + s.replace(/]/g,"]]") + "]";
+const qTable = s => s.split(".").map(p=>{ p = p.trim(); return /^\[.*\]$/.test(p) ? p : qn(p) }).join(".");
+const sqlStr = s => "N'" + s.replace(/'/g,"''") + "'";
+function expQuery(){
+  const src = segVal("#segExp"), top = Math.max(0, Math.floor(+$("#eTop").value||0)), like = $("#eLike").value.trim();
+  const T = top ? `TOP (${top}) ` : "";
+  const E = x => `REPLACE(REPLACE(REPLACE(REPLACE(${x}, N'\\', N'\\\\'), NCHAR(13), N'\\r'), NCHAR(10), N'\\n'), NCHAR(9), N'\\t')`;
+  if(src === "xel"){
+    const xv = (n,ty) => `x.e.value('(event/data[@name=''${n}'']/value)[1]', '${ty}')`;
+    const path = $("#eXel").value.trim() || "D:\\XE\\my_session*.xel";
+    return `SELECT ${T}x.object_name,
+       CONVERT(varchar(27), v.ts, 126),
+       v.duration, v.cpu_time, v.logical_reads, v.physical_reads, v.writes, v.row_count,
+       ${E("v.statement")}
+FROM (SELECT object_name, CAST(event_data AS xml) AS e
+      FROM sys.fn_xe_file_target_read_file(${sqlStr(path)}, NULL, NULL, NULL)
+      WHERE object_name = N'rpc_completed') AS x
+CROSS APPLY (SELECT x.e.value('(event/@timestamp)[1]', 'datetime2(3)') AS ts,
+       ${xv("duration","bigint")} AS duration,
+       ${xv("cpu_time","bigint")} AS cpu_time,
+       ${xv("logical_reads","bigint")} AS logical_reads,
+       ${xv("physical_reads","bigint")} AS physical_reads,
+       ${xv("writes","bigint")} AS writes,
+       ${xv("row_count","bigint")} AS row_count,
+       ${xv("statement","nvarchar(max)")} AS statement) AS v
+WHERE v.statement IS NOT NULL${like? `\n  AND v.statement LIKE ${sqlStr(like)}` : ""}
+OPTION (MAXDOP 1);`;
+  }
+  const c = k => { const el = $("#e_"+k); return el ? el.value.trim() : "" };
+  const stmt = qn(c("stmt") || "statement");
+  const num = k => c(k) ? `TRY_CAST(${qn(c(k))} AS bigint)` : "NULL";
+  const where = [`${stmt} IS NOT NULL`];
+  if(c("ev") && $("#eOnlyRpc").checked) where.push(`${qn(c("ev"))} = N'rpc_completed'`);
+  if(like) where.push(`${stmt} LIKE ${sqlStr(like)}`);
+  return `SELECT ${T}${c("ev") ? `CAST(${qn(c("ev"))} AS nvarchar(60))` : "N''"},
+       ${c("ts") ? `CONVERT(varchar(27), TRY_CAST(${qn(c("ts"))} AS datetime2(3)), 126)` : "NULL"},
+       ${num("duration")}, ${num("cpu")}, ${num("reads")},
+       ${num("physical")}, ${num("writes")}, ${num("rows")},
+       ${E(`CAST(${stmt} AS nvarchar(max))`)}
+FROM ${qTable($("#eTable").value.trim() || "dbo.__xe_event_file")}
+WHERE ${where.join("\n  AND ")}
+OPTION (MAXDOP 1);`;
+}
+function renderExport(){
+  const src = segVal("#segExp");
+  const q = expQuery();
+  $("#expSql").textContent = q;
+  const one = q.replace(/\s*\n\s*/g, " ");
+  const auth = $("#eAuth").value === "sql" ? `-U ${$("#eUser").value.trim() || "user"}` : "-T";
+  const db = src === "xel" ? "master" : ($("#eDb").value.trim() || "MyDatabase");
+  $("#expBcp").textContent = `bcp "${one}" queryout "${$("#eOut").value.trim() || "events.tsv"}" -S ${$("#eServer").value.trim() || "SERVER"} -d ${db} ${auth} -w`;
+}
+seg("#segExp", v=>{ $("#expXel").classList.toggle("hidden", v!=="xel"); $("#expTable").classList.toggle("hidden", v!=="table"); renderExport() });
+$("#eAuth").addEventListener("change", e=>{ $("#eUserL").classList.toggle("hidden", e.target.value!=="sql"); renderExport() });
+$("#vFile").addEventListener("input", e=>{ if(/^e/.test(e.target.id)) renderExport() });
+$("#vFile").addEventListener("click", e=>{
+  const b = e.target.closest("[data-copy]"); if(b) copyText(b, $("#"+b.dataset.copy));
+});
+
+/* ---------- start ---------- */
+applyLang();
 if(STATIC){
   $("#btnQuit").classList.add("hidden");
   loadResults();
+}else if(LOCAL){
+  $("#btnQuit").classList.add("hidden");
+  showSetup();
 }else{
   api("/api/status").then(st=>{ if(st.state==="done"||st.state==="canceled") loadResults(); else if(st.state==="running"){ $("#progOv").classList.remove("hidden"); poll() } }).catch(()=>{});
 }

@@ -28,13 +28,13 @@ type ConnReq struct {
 func (c ConnReq) build() (string, error) {
 	if c.Mode == "string" {
 		if strings.TrimSpace(c.ConnString) == "" {
-			return "", errors.New("informe a connection string")
+			return "", errors.New("enter the connection string")
 		}
 		return c.ConnString, nil
 	}
 	srv := strings.TrimSpace(c.Server)
 	if srv == "" {
-		return "", errors.New("informe o servidor")
+		return "", errors.New("enter the server")
 	}
 	srv = strings.TrimPrefix(srv, "tcp:")
 	host, port, inst := srv, "", ""
@@ -232,7 +232,7 @@ func BuildQuery(s SourceReq) (string, []any, error) {
 	case "table":
 		stmt := s.Cols["stmt"]
 		if s.DB == "" || s.Table == "" || stmt == "" {
-			return "", nil, errors.New("escolha a base, a tabela e a coluna do statement")
+			return "", nil, errors.New("choose the database, the table and the statement column")
 		}
 		sel := []string{"CAST(" + qn(stmt) + " AS nvarchar(max))"}
 		for _, m := range metricKeys {
@@ -258,7 +258,7 @@ func BuildQuery(s SourceReq) (string, []any, error) {
 		return q, args, nil
 	case "xel":
 		if strings.TrimSpace(s.XelPath) == "" {
-			return "", nil, errors.New("informe o caminho do .xel (no servidor)")
+			return "", nil, errors.New("enter the .xel path (on the server)")
 		}
 		ev := strings.TrimSpace(s.EventValue)
 		if ev == "" {
@@ -291,7 +291,7 @@ WHERE v.statement IS NOT NULL`
 		}
 		return q, args, nil
 	}
-	return "", nil, fmt.Errorf("fonte desconhecida: %s", s.Type)
+	return "", nil, fmt.Errorf("unknown source: %s", s.Type)
 }
 
 func runSQLSource(ctx context.Context, c ConnReq, s SourceReq, emit func(Row)) error {

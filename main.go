@@ -22,7 +22,21 @@ import (
 )
 
 //go:embed web/index.html
-var indexHTML []byte
+var indexSrc []byte
+
+//go:embed web/engine.js
+var engineJS []byte
+
+// indexHTML é a interface com o motor JS embutido (o mesmo arquivo serve o .exe,
+// o relatório exportado e a versão 100% HTML).
+var indexHTML = assembleHTML(indexSrc, engineJS)
+
+// assembleHTML injeta o motor JS no marcador <!--ENGINE--> do index.html.
+func assembleHTML(index, engine []byte) []byte {
+	inj := append([]byte("<script id=\"pl-engine\">\n"), engine...)
+	inj = append(inj, []byte("</script>")...)
+	return bytes.Replace(index, []byte("<!--ENGINE-->"), inj, 1)
+}
 
 var version = "1.0.0"
 
@@ -42,10 +56,20 @@ var (
 )
 
 func main() {
-	port := flag.Int("port", 0, "porta local (0 = automática)")
-	noBrowser := flag.Bool("no-browser", false, "não abrir o navegador")
-	bind := flag.String("bind", "127.0.0.1", "endereço de escuta (0.0.0.0 só dentro de container, publicando a porta em 127.0.0.1)")
+	port := flag.Int("port", 0, "local port (0 = automatic)")
+	noBrowser := flag.Bool("no-browser", false, "do not open the browser")
+	bind := flag.String("bind", "127.0.0.1", "listen address (use 0.0.0.0 only inside a container, publishing the port on 127.0.0.1)")
+	writeHTML := flag.String("write-html", "", "write the standalone (offline) HTML version to this file and exit")
 	flag.Parse()
+
+	if *writeHTML != "" {
+		if err := os.WriteFile(*writeHTML, indexHTML, 0o644); err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+		fmt.Println("Written:", *writeHTML)
+		return
+	}
 
 	b := make([]byte, 16)
 	rand.Read(b)
@@ -53,7 +77,7 @@ func main() {
 
 	ln, err := net.Listen("tcp", net.JoinHostPort(*bind, strconv.Itoa(*port)))
 	if err != nil {
-		fmt.Println("Não foi possível abrir a porta local:", err)
+		fmt.Println("Could not open the local port:", err)
 		waitExit()
 		return
 	}
@@ -79,11 +103,11 @@ func main() {
 	api("/api/quit", hQuit)
 
 	fmt.Println("==============================================")
-	fmt.Println(" ParamLens " + version + " — perfil de parâmetros do rpc_completed")
+	fmt.Println(" ParamLens " + version + " — parameter profiling for rpc_completed")
 	fmt.Println("==============================================")
 	fmt.Println(" Interface: " + u)
-	fmt.Println(" Só aceita conexões desta máquina (127.0.0.1).")
-	fmt.Println(" Feche esta janela para encerrar.")
+	fmt.Println(" Only accepts connections from this machine (127.0.0.1).")
+	fmt.Println(" Close this window to quit.")
 	fmt.Println()
 
 	if !*noBrowser {
@@ -101,13 +125,13 @@ func main() {
 	}()
 	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
-		fmt.Println("Erro:", err)
+		fmt.Println("Error:", err)
 		waitExit()
 	}
 }
 
 func waitExit() {
-	fmt.Println("Pressione Enter para sair.")
+	fmt.Println("Press Enter to exit.")
 	fmt.Scanln()
 }
 
@@ -133,7 +157,7 @@ func openBrowser(u string) {
 		cmd = exec.Command("xdg-open", u)
 	}
 	if err := cmd.Start(); err != nil {
-		fmt.Println(" Abra no navegador:", u)
+		fmt.Println(" Open in your browser:", u)
 	}
 }
 
@@ -144,7 +168,7 @@ func guard(addr string, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
 		if host != "127.0.0.1:"+port && host != "localhost:"+port {
-			http.Error(w, "host inválido", http.StatusForbidden)
+			http.Error(w, "invalid host", http.StatusForbidden)
 			return
 		}
 		t := r.Header.Get("X-Token")
@@ -152,7 +176,7 @@ func guard(addr string, h http.HandlerFunc) http.HandlerFunc {
 			t = r.URL.Query().Get("t")
 		}
 		if t != token {
-			http.Error(w, "token inválido — reabra pelo link mostrado no console", http.StatusForbidden)
+			http.Error(w, "invalid token — reopen the link shown in the console", http.StatusForbidden)
 			return
 		}
 		h(w, r)
@@ -292,7 +316,7 @@ func hAnalyze(w http.ResponseWriter, r *http.Request) {
 		if job.state == "running" {
 			jobMu.Unlock()
 			eng.Close()
-			writeErr(w, fmt.Errorf("já existe uma análise em andamento"))
+			writeErr(w, fmt.Errorf("an analysis is already running"))
 			return
 		}
 		job.eng.Close()
@@ -305,7 +329,7 @@ func hAnalyze(w http.ResponseWriter, r *http.Request) {
 	case "xel":
 		j.label = req.Source.XelPath
 	default:
-		j.label = "dados de exemplo"
+		j.label = "sample data"
 	}
 	job = j
 	jobMu.Unlock()
@@ -377,7 +401,7 @@ func curEngine() (*Engine, string, string) {
 func hOverview(w http.ResponseWriter, r *http.Request) {
 	e, label, state := curEngine()
 	if e == nil {
-		writeErr(w, fmt.Errorf("nenhuma análise concluída"))
+		writeErr(w, fmt.Errorf("no finished analysis"))
 		return
 	}
 	ov := e.Overview()
@@ -387,13 +411,13 @@ func hOverview(w http.ResponseWriter, r *http.Request) {
 func hFamily(w http.ResponseWriter, r *http.Request) {
 	e, _, _ := curEngine()
 	if e == nil {
-		writeErr(w, fmt.Errorf("nenhuma análise concluída"))
+		writeErr(w, fmt.Errorf("no finished analysis"))
 		return
 	}
 	id, _ := strconv.Atoi(r.URL.Query().Get("id"))
 	d, ok := e.Detail(id)
 	if !ok {
-		writeErr(w, fmt.Errorf("família não encontrada"))
+		writeErr(w, fmt.Errorf("query not found"))
 		return
 	}
 	writeJSON(w, d)
@@ -402,7 +426,7 @@ func hFamily(w http.ResponseWriter, r *http.Request) {
 func hCombos(w http.ResponseWriter, r *http.Request) {
 	e, _, _ := curEngine()
 	if e == nil {
-		writeErr(w, fmt.Errorf("nenhuma análise concluída"))
+		writeErr(w, fmt.Errorf("no finished analysis"))
 		return
 	}
 	var req struct {
@@ -415,7 +439,7 @@ func hCombos(w http.ResponseWriter, r *http.Request) {
 	}
 	c, ok := e.Combos(req.ID, req.Indexes)
 	if !ok {
-		writeErr(w, fmt.Errorf("família não encontrada"))
+		writeErr(w, fmt.Errorf("query not found"))
 		return
 	}
 	writeJSON(w, c)
@@ -424,13 +448,13 @@ func hCombos(w http.ResponseWriter, r *http.Request) {
 func hSample(w http.ResponseWriter, r *http.Request) {
 	e, _, _ := curEngine()
 	if e == nil {
-		writeErr(w, fmt.Errorf("nenhuma análise concluída"))
+		writeErr(w, fmt.Errorf("no finished analysis"))
 		return
 	}
 	ix, _ := strconv.Atoi(r.URL.Query().Get("exec"))
 	s, err := e.Statement(ix)
 	if err != nil {
-		writeErr(w, fmt.Errorf("execução não encontrada"))
+		writeErr(w, fmt.Errorf("execution not found"))
 		return
 	}
 	writeJSON(w, map[string]string{"statement": s, "script": TestScript(s)})
@@ -439,7 +463,7 @@ func hSample(w http.ResponseWriter, r *http.Request) {
 func hExport(w http.ResponseWriter, r *http.Request) {
 	e, label, _ := curEngine()
 	if e == nil {
-		writeErr(w, fmt.Errorf("nenhuma análise concluída"))
+		writeErr(w, fmt.Errorf("no finished analysis"))
 		return
 	}
 	ov := e.Overview()

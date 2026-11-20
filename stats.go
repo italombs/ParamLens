@@ -1,16 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 )
 
 type Agg struct {
-	Count  int              `json:"count"`
-	Sum    Metrics          `json:"sum"`
-	Max    Metrics          `json:"max"`
-	Sample int32            `json:"sample"`
+	Count  int     `json:"count"`
+	Sum    Metrics `json:"sum"`
+	Max    Metrics `json:"max"`
+	Sample int32   `json:"sample"`
 }
 
 func (a *Agg) add(ex *Exec, idx int32) {
@@ -27,31 +26,31 @@ func (a *Agg) add(ex *Exec, idx int32) {
 }
 
 type Overview struct {
-	Totals     Agg              `json:"totals"`
-	Has        [NMetrics]bool   `json:"has"`
-	CostMetric int              `json:"costMetric"`
-	Read       int64            `json:"read"`
-	Parsed     int64            `json:"parsed"`
-	Failed     int64            `json:"failed"`
-	FailKinds  map[string]int   `json:"failKinds"`
-	Fails      []ParseFail      `json:"fails"`
-	Families   []FamilySummary  `json:"families"`
-	Findings   []Finding        `json:"findings"`
-	ElapsedMs  int64            `json:"elapsedMs"`
-	Options    map[string]bool  `json:"options"`
+	Totals     Agg             `json:"totals"`
+	Has        [NMetrics]bool  `json:"has"`
+	CostMetric int             `json:"costMetric"`
+	Read       int64           `json:"read"`
+	Parsed     int64           `json:"parsed"`
+	Failed     int64           `json:"failed"`
+	FailKinds  map[string]int  `json:"failKinds"`
+	Fails      []ParseFail     `json:"fails"`
+	Families   []FamilySummary `json:"families"`
+	Findings   []Finding       `json:"findings"`
+	ElapsedMs  int64           `json:"elapsedMs"`
+	Options    map[string]bool `json:"options"`
 }
 
 type FamilySummary struct {
-	ID        int     `json:"id"`
-	Proc      string  `json:"proc"`
-	Kind      string  `json:"kind"`
-	Title     string  `json:"title"`
-	Agg       Agg     `json:"agg"`
+	ID        int               `json:"id"`
+	Proc      string            `json:"proc"`
+	Kind      string            `json:"kind"`
+	Title     string            `json:"title"`
+	Agg       Agg               `json:"agg"`
 	Share     [NMetrics]float64 `json:"share"`
-	ExecShare float64 `json:"execShare"`
-	Params    int     `json:"params"`
-	Findings  int     `json:"findings"`
-	MaxSev    int     `json:"maxSev"`
+	ExecShare float64           `json:"execShare"`
+	Params    int               `json:"params"`
+	Findings  int               `json:"findings"`
+	MaxSev    int               `json:"maxSev"`
 }
 
 type ValueStat struct {
@@ -69,7 +68,7 @@ type ParamStat struct {
 	Types    []KV        `json:"types,omitempty"`
 	Distinct int         `json:"distinct"`
 	Overflow bool        `json:"overflow"`
-	Card     string      `json:"card"` // constante | baixa | alta
+	Card     string      `json:"card"` // constant | low | high| baixa | alta
 	NullPct  float64     `json:"nullPct"`
 	Top      []ValueStat `json:"top"`
 	Classes  []ValueStat `json:"classes,omitempty"`
@@ -106,12 +105,11 @@ type PatternStat struct {
 }
 
 type Finding struct {
-	Sev        int    `json:"sev"` // 3 alta, 2 média, 1 info
-	Family     int    `json:"family"`
-	Title      string `json:"title"`
-	Detail     string `json:"detail"`
-	Suggestion string `json:"suggestion,omitempty"`
-	Code       string `json:"code,omitempty"`
+	Sev    int            `json:"sev"` // 3 high, 2 medium, 1 info
+	Family int            `json:"family"`
+	Msg    string         `json:"msg"`  // message id, rendered by the UI
+	Args   map[string]any `json:"args"` // raw values for the message
+	Code   string         `json:"code,omitempty"`
 }
 
 type FamilyDetail struct {
@@ -127,6 +125,13 @@ type FamilyDetail struct {
 }
 
 const lowCardLimit = 30
+
+// cardinality classes and other ids shown (translated) by the UI
+const (
+	cardConstant = "constant"
+	cardLow      = "low"
+	cardHigh     = "high"
+)
 
 func (e *Engine) costMetric() int {
 	for _, m := range []int{MReads, MCpu, MDur} {
@@ -201,7 +206,7 @@ func (e *Engine) Overview() Overview {
 		ov.Findings = append(ov.Findings, d.Findings...)
 	}
 	cm := ov.CostMetric
-	sort.Slice(ov.Families, func(i, j int) bool {
+	sort.SliceStable(ov.Families, func(i, j int) bool {
 		a, b := ov.Families[i], ov.Families[j]
 		if cm >= 0 && a.Agg.Sum[cm] != b.Agg.Sum[cm] {
 			return a.Agg.Sum[cm] > b.Agg.Sum[cm]
@@ -258,7 +263,7 @@ func (e *Engine) detailLocked(f *Family, tot Agg) *FamilyDetail {
 	for k, v := range f.Decls {
 		d.Decls = append(d.Decls, KV{k, v})
 	}
-	sort.Slice(d.Decls, func(i, j int) bool { return d.Decls[i].V > d.Decls[j].V })
+	sort.Slice(d.Decls, func(i, j int) bool { return kvLess(d.Decls[i], d.Decls[j]) })
 	d.Findings = e.findings(f, d, fa)
 	for _, fd := range d.Findings {
 		if fd.Sev > d.Summary.MaxSev {
@@ -280,7 +285,7 @@ func classOf(v string) string {
 			if f == 0 || f == -1 || f == 1 {
 				return v
 			}
-			return "(número ≠ 0/1/-1)"
+			return "(number ≠ 0/1/-1)"
 		}
 	}
 	if u, quoted := unq(v); quoted {
@@ -289,11 +294,11 @@ func classOf(v string) string {
 			return v
 		}
 		if len(u) >= 10 && u[4] == '-' && u[7] == '-' {
-			return "(data)"
+			return "(date)"
 		}
-		return "(texto)"
+		return "(text)"
 	}
-	return "(outro)"
+	return "(other)"
 }
 
 func (e *Engine) paramStats(f *Family, fa Agg) []ParamStat {
@@ -318,7 +323,7 @@ func (e *Engine) paramStats(f *Family, fa Agg) []ParamStat {
 		for t, c := range p.Types {
 			ps.Types = append(ps.Types, KV{t, c})
 		}
-		sort.Slice(ps.Types, func(i, j int) bool { return ps.Types[i].V > ps.Types[j].V })
+		sort.Slice(ps.Types, func(i, j int) bool { return kvLess(ps.Types[i], ps.Types[j]) })
 		if len(ps.Types) > 0 {
 			ps.Type = ps.Types[0].K
 		}
@@ -347,13 +352,13 @@ func (e *Engine) paramStats(f *Family, fa Agg) []ParamStat {
 		})
 		switch {
 		case ps.Distinct <= 1:
-			ps.Card = "constante"
+			ps.Card = cardConstant
 		case ps.Distinct <= lowCardLimit && !p.Dict.overflow:
-			ps.Card = "baixa"
+			ps.Card = cardLow
 		default:
-			ps.Card = "alta"
+			ps.Card = cardHigh
 		}
-		if ps.Card == "alta" {
+		if ps.Card == cardHigh {
 			cl := map[string]*ValueStat{}
 			var order []string
 			for _, v := range vs {
@@ -372,7 +377,7 @@ func (e *Engine) paramStats(f *Family, fa Agg) []ParamStat {
 				x.Share = shareOf(x.Agg, fa)
 				ps.Classes = append(ps.Classes, *x)
 			}
-			sort.Slice(ps.Classes, func(i, j int) bool { return ps.Classes[i].Agg.Count > ps.Classes[j].Agg.Count })
+			sort.SliceStable(ps.Classes, func(i, j int) bool { return ps.Classes[i].Agg.Count > ps.Classes[j].Agg.Count })
 		}
 		if len(vs) > 25 {
 			for _, v := range vs[25:] {
@@ -407,10 +412,10 @@ func defaultComboParams(ps []ParamStat, pats []PatternStat) []int {
 		byName[strings.ToLower(p.Name)] = p
 	}
 	addP := func(p ParamStat) {
-		if used[p.Index] || p.Card == "constante" || p.Pseudo != "" || len(sel) >= 6 {
+		if used[p.Index] || p.Card == cardConstant || p.Pseudo != "" || len(sel) >= 6 {
 			return
 		}
-		if p.Card == "alta" && len(p.Classes) < 2 {
+		if p.Card == cardHigh && len(p.Classes) < 2 {
 			return
 		}
 		used[p.Index] = true
@@ -422,7 +427,7 @@ func defaultComboParams(ps []ParamStat, pats []PatternStat) []int {
 		}
 	}
 	for _, p := range ps {
-		if p.Card == "baixa" && p.Distinct <= 10 {
+		if p.Card == cardLow && p.Distinct <= 10 {
 			addP(p)
 		}
 	}
@@ -444,7 +449,7 @@ func (e *Engine) shapesLocked(f *Family, fa Agg, pats []PatternStat) ComboResult
 	}
 	for _, p := range use {
 		res.Params = append(res.Params, p.Cond)
-		res.Modes = append(res.Modes, "formato")
+		res.Modes = append(res.Modes, "shape")
 	}
 	groups := map[string]*ComboRow{}
 	var keys []string
@@ -460,7 +465,7 @@ func (e *Engine) shapesLocked(f *Family, fa Agg, pats []PatternStat) ComboResult
 			case v:
 				vals[k], buf[k] = "pass-through", 'T'
 			default:
-				vals[k], buf[k] = "filtra", 'F'
+				vals[k], buf[k] = "filter", 'F'
 			}
 		}
 		key := string(buf)
@@ -479,7 +484,7 @@ func (e *Engine) shapesLocked(f *Family, fa Agg, pats []PatternStat) ComboResult
 		g.Share = shareOf(g.Agg, fa)
 		res.Rows = append(res.Rows, *g)
 	}
-	sort.Slice(res.Rows, func(i, j int) bool { return res.Rows[i].Agg.Count > res.Rows[j].Agg.Count })
+	sort.SliceStable(res.Rows, func(i, j int) bool { return res.Rows[i].Agg.Count > res.Rows[j].Agg.Count })
 	if len(res.Rows) > 100 {
 		res.Rows = res.Rows[:100]
 	}
@@ -513,9 +518,9 @@ func (e *Engine) combosLocked(f *Family, fa Agg, idx []int) ComboResult {
 		res.Indexes = append(res.Indexes, pi)
 		if len(p.Dict.vals) > lowCardLimit || p.Dict.overflow {
 			useClass[k] = true
-			res.Modes = append(res.Modes, "classe")
+			res.Modes = append(res.Modes, "class")
 		} else {
-			res.Modes = append(res.Modes, "valor")
+			res.Modes = append(res.Modes, "value")
 		}
 	}
 	groups := map[string]*ComboRow{}
@@ -565,7 +570,7 @@ func (e *Engine) combosLocked(f *Family, fa Agg, idx []int) ComboResult {
 		g.Share = shareOf(g.Agg, fa)
 		rows = append(rows, *g)
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].Agg.Count > rows[j].Agg.Count })
+	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Agg.Count > rows[j].Agg.Count })
 	if len(rows) > 100 {
 		rows = rows[:100]
 	}
@@ -599,52 +604,6 @@ func (e *Engine) patternStats(f *Family) []PatternStat {
 	return out
 }
 
-func pct(x float64) string {
-	return dec(fmt.Sprintf("%.1f%%", x*100))
-}
-
-// dec formata números no padrão pt-BR (vírgula decimal, ponto de milhar).
-func dec(s string) string {
-	out := []byte{}
-	i := 0
-	for i < len(s) {
-		if s[i] >= '0' && s[i] <= '9' {
-			j := i
-			for j < len(s) && s[j] >= '0' && s[j] <= '9' {
-				j++
-			}
-			intPart := s[i:j]
-			if len(intPart) > 3 && !(i > 0 && (s[i-1] == '.' || s[i-1] == ',')) {
-				var g []byte
-				for k, c := range []byte(intPart) {
-					if k > 0 && (len(intPart)-k)%3 == 0 {
-						g = append(g, '.')
-					}
-					g = append(g, c)
-				}
-				out = append(out, g...)
-			} else {
-				out = append(out, intPart...)
-			}
-			if j < len(s)-1 && s[j] == '.' && s[j+1] >= '0' && s[j+1] <= '9' {
-				out = append(out, ',')
-				j++
-				k := j
-				for k < len(s) && s[k] >= '0' && s[k] <= '9' {
-					k++
-				}
-				out = append(out, s[j:k]...)
-				j = k
-			}
-			i = j
-			continue
-		}
-		out = append(out, s[i])
-		i++
-	}
-	return string(out)
-}
-
 func avg(a Agg, m int) float64 {
 	if a.Count == 0 || m < 0 {
 		return 0
@@ -652,29 +611,8 @@ func avg(a Agg, m int) float64 {
 	return float64(a.Sum[m]) / float64(a.Count)
 }
 
-func metricLabel(m int) string {
-	switch m {
-	case MReads:
-		return "logical reads"
-	case MCpu:
-		return "CPU"
-	case MDur:
-		return "duração"
-	}
-	return "custo"
-}
-
-func fmtMetric(m int, v float64) string {
-	switch m {
-	case MCpu, MDur:
-		return dec(fmt.Sprintf("%.1f ms", v/1000))
-	}
-	if v >= 100 {
-		return dec(fmt.Sprintf("%.0f", v))
-	}
-	return dec(fmt.Sprintf("%.1f", v))
-}
-
+// findings produces structured findings (Msg + Args with raw numbers). The text, in
+// English or pt-BR, is built by the UI (web/index.html), so both engines stay language-free.
 func (e *Engine) findings(f *Family, d *FamilyDetail, fa Agg) []Finding {
 	var out []Finding
 	cm := e.costMetric()
@@ -689,72 +627,52 @@ func (e *Engine) findings(f *Family, d *FamilyDetail, fa Agg) []Finding {
 		}
 		return s
 	}
-	costCmp := func(t, fl Agg) string {
-		if cm < 0 || t.Count == 0 || fl.Count == 0 {
-			return ""
+	// average cost when the condition is true vs false
+	withCost := func(args map[string]any, t, fl Agg) map[string]any {
+		if cm >= 0 && t.Count > 0 && fl.Count > 0 {
+			args["cost"] = map[string]any{"m": cm, "t": avg(t, cm), "f": avg(fl, cm)}
 		}
-		return fmt.Sprintf(" Média de %s: %s quando verdadeiro × %s quando falso.", metricLabel(cm), fmtMetric(cm, avg(t, cm)), fmtMetric(cm, avg(fl, cm)))
+		return args
 	}
 
-	// 1) predicados catch-all
+	// 1) catch-all predicates
 	for _, p := range d.Patterns {
-		cond := p.Cond
+		tp := p.TruePct
 		if p.Kind == "isnull" {
-			tp := p.TruePct
 			sev := 1
 			if tp >= 0.8 || (tp > 0.2 && tp < 0.8) {
 				sev = 2
 			}
-			out = append(out, Finding{
-				Sev: bump(sev), Family: f.ID,
-				Title:      fmt.Sprintf("ISNULL/COALESCE com parâmetro: %s é NULL em %s das execuções", p.Var, pct(tp)),
-				Detail:     "Padrão " + p.Snippet + ". Funções sobre a coluna/parâmetro costumam impedir seek e o plano é o mesmo para os dois casos." + costCmp(p.True, p.False),
-				Suggestion: "Reescreva como (" + p.Var + " IS NULL OR col = " + p.Var + ") com OPTION(RECOMPILE), ou separe as duas formas da query.",
-				Code:       p.Snippet,
-			})
+			out = append(out, Finding{Sev: bump(sev), Family: f.ID, Msg: "isnull", Code: p.Snippet,
+				Args: withCost(map[string]any{"var": p.Var, "pct": tp}, p.True, p.False)})
 			continue
 		}
-		tp := p.TruePct
 		var sev int
-		var title, detail, sug string
+		var msg string
 		switch {
 		case tp >= 0.999:
-			sev = 3
-			title = fmt.Sprintf("Catch-all sempre verdadeiro: %s em 100%% das execuções", cond)
-			detail = "O outro lado do OR nunca filtra nada nesta amostra, mas o otimizador precisa de um plano que sirva para os dois casos."
-			sug = "O filtro parece nunca ser usado: remova o ramo, ou separe a query para o caso em que ele é aplicado."
+			sev, msg = 3, "catchall.always"
 		case tp >= 0.8:
-			sev = 3
-			title = fmt.Sprintf("Catch-all: %s é verdadeiro em %s das execuções", cond, pct(tp))
-			detail = "Na maioria das chamadas o OR vira pass-through (o filtro não se aplica). O plano único em cache costuma ser scan/hash para servir ambos os casos."
-			sug = "Separe em duas queries (ou IF/ELSE, duas Advanced SQL no OutSystems), monte o filtro dinamicamente só quando aplicável, ou use OPTION(RECOMPILE). Se o filtro depende de um LEFT JOIN usado só para filtrar, troque por EXISTS/NOT EXISTS condicionado ao parâmetro."
+			sev, msg = 3, "catchall.mostly"
 		case tp <= 0.001:
-			sev = 1
-			title = fmt.Sprintf("Catch-all nunca verdadeiro: %s em 0%% das execuções", cond)
-			detail = "O filtro sempre se aplica nesta amostra; o ramo do OR é peso morto que ainda atrapalha a estimativa."
-			sug = "Remova o ramo '" + cond + " OR' se ele não for necessário em outros fluxos."
+			sev, msg = 1, "catchall.never"
 		case tp <= 0.2:
-			sev = 2
-			title = fmt.Sprintf("Catch-all: %s é verdadeiro em só %s das execuções", cond, pct(tp))
-			detail = "Na maioria das chamadas o filtro é aplicado, mas o plano precisa contemplar o caso sem filtro."
-			sug = "Considere separar o caso raro (sem filtro) em outra query/branch ou usar OPTION(RECOMPILE) nesse fluxo."
+			sev, msg = 2, "catchall.rare"
 		default:
-			sev = 2
-			title = fmt.Sprintf("Catch-all dividido: %s é verdadeiro em %s das execuções", cond, pct(tp))
-			detail = "Dois padrões de acesso bem diferentes compartilham o mesmo plano em cache."
-			sug = "Bom candidato a OPTION(RECOMPILE) ou a separar em duas queries."
+			sev, msg = 2, "catchall.split"
 		}
-		out = append(out, Finding{Sev: bump(sev), Family: f.ID, Title: title, Detail: detail + costCmp(p.True, p.False), Suggestion: sug, Code: p.Snippet})
+		out = append(out, Finding{Sev: bump(sev), Family: f.ID, Msg: msg, Code: p.Snippet,
+			Args: withCost(map[string]any{"cond": p.Cond, "pct": tp}, p.True, p.False)})
 	}
 
-	// 2) valores dominantes / skew de custo por valor
+	// 2) dominant values / unequal cost per value
 	inPattern := map[string]bool{}
 	for _, p := range d.Patterns {
 		inPattern[strings.ToLower(p.Var)] = true
 	}
 	var constants []string
 	for _, ps := range d.Params {
-		if ps.Card == "constante" && ps.Pseudo == "" && fa.Count >= 20 {
+		if ps.Card == cardConstant && ps.Pseudo == "" && fa.Count >= 20 {
 			v := ""
 			if len(ps.Top) > 0 {
 				v = ps.Top[0].Value
@@ -762,14 +680,13 @@ func (e *Engine) findings(f *Family, d *FamilyDetail, fa Agg) []Finding {
 			constants = append(constants, ps.Name+" = "+v)
 			continue
 		}
-		if ps.Card == "constante" || ps.Pseudo == pseudoInVals || len(ps.Top) == 0 {
+		if ps.Card == cardConstant || ps.Pseudo == pseudoInVals || len(ps.Top) == 0 {
 			continue
 		}
 		top := ps.Top[0]
 		if top.Pct >= 0.9 && fa.Count >= 20 && ps.Pseudo == "" {
-			fd := Finding{Sev: 1, Family: f.ID,
-				Title:  fmt.Sprintf("%s vale %s em %s das execuções", ps.Name, top.Value, pct(top.Pct)),
-				Detail: "Valor dominante: o plano em cache quase sempre será compilado para ele."}
+			fd := Finding{Sev: 1, Family: f.ID, Msg: "dominant",
+				Args: map[string]any{"name": ps.Name, "value": top.Value, "pct": top.Pct}}
 			if cm >= 0 {
 				var rest Agg
 				for _, v := range ps.Top[1:] {
@@ -779,20 +696,19 @@ func (e *Engine) findings(f *Family, d *FamilyDetail, fa Agg) []Finding {
 					a1, a2 := avg(top.Agg, cm), avg(rest, cm)
 					if a1 > 0 && (a2/a1 >= 10 || a1/a2 >= 10) {
 						fd.Sev = 3
-						fd.Title += " — custo muito diferente nos demais valores"
-						fd.Detail = fmt.Sprintf("Média de %s: %s com %s × %s com os demais valores. Forte indício de parameter sniffing.", metricLabel(cm), fmtMetric(cm, a1), top.Value, fmtMetric(cm, a2))
-						fd.Suggestion = "Avalie OPTION(RECOMPILE), OPTIMIZE FOR, ou separar o fluxo do valor dominante do restante."
+						fd.Msg = "dominant.sniff"
+						fd.Args["m"], fd.Args["a1"], fd.Args["a2"] = cm, a1, a2
 					}
 				}
 			}
 			if fd.Sev < 3 && inPattern[strings.ToLower(ps.Name)] {
-				continue // já coberto pelo achado de catch-all
+				continue // already covered by the catch-all finding
 			}
 			fd.Sev = bump(fd.Sev)
 			out = append(out, fd)
 			continue
 		}
-		if ps.Card == "baixa" && cm >= 0 {
+		if ps.Card == cardLow && cm >= 0 {
 			minA, maxA := -1.0, -1.0
 			var minV, maxV string
 			thr := fa.Count / 100
@@ -812,62 +728,51 @@ func (e *Engine) findings(f *Family, d *FamilyDetail, fa Agg) []Finding {
 				}
 			}
 			if minA > 0 && maxA/minA >= 20 {
-				out = append(out, Finding{Sev: bump(2), Family: f.ID,
-					Title:      fmt.Sprintf("Custo desigual por valor de %s (até %sx)", ps.Name, dec(fmt.Sprintf("%.0f", maxA/minA))),
-					Detail:     fmt.Sprintf("Média de %s: %s com %s × %s com %s.", metricLabel(cm), fmtMetric(cm, maxA), maxV, fmtMetric(cm, minA), minV),
-					Suggestion: "Possível sensibilidade a parâmetro: o plano compilado para um valor pode ser ruim para o outro."})
+				out = append(out, Finding{Sev: bump(2), Family: f.ID, Msg: "unequal",
+					Args: map[string]any{"name": ps.Name, "ratio": maxA / minA, "m": cm, "max": maxA, "maxV": maxV, "min": minA, "minV": minV}})
 			}
 		}
 	}
 	if len(constants) > 0 {
 		sort.Strings(constants)
-		show := constants
+		show, more := constants, 0
 		if len(show) > 8 {
-			show = append(show[:8:8], fmt.Sprintf("… (+%d)", len(constants)-8))
+			show, more = show[:8], len(constants)-8
 		}
-		out = append(out, Finding{Sev: 1, Family: f.ID,
-			Title:  fmt.Sprintf("%d parâmetro(s) com valor sempre igual", len(constants)),
-			Detail: strings.Join(show, "; ") + ". Podem estar fixos na aplicação: predicados com eles são sempre iguais e às vezes removíveis."})
+		out = append(out, Finding{Sev: 1, Family: f.ID, Msg: "constants",
+			Args: map[string]any{"count": len(constants), "items": show, "more": more}})
 	}
 
-	// 3) combinações desproporcionalmente caras
+	// 3) disproportionately expensive combinations
 	if cm >= 0 && len(d.Combos.Params) > 0 {
 		for _, r := range d.Combos.Rows {
 			if r.Pct > 0 && r.Share[cm] >= 0.2 && r.Share[cm]/r.Pct >= 3 {
-				var parts []string
+				parts := []string{}
 				for k, v := range r.Values {
 					parts = append(parts, d.Combos.Params[k]+"="+v)
 				}
-				out = append(out, Finding{Sev: bump(2), Family: f.ID,
-					Title:  fmt.Sprintf("Combinação com %s das execuções responde por %s do %s", pct(r.Pct), pct(r.Share[cm]), metricLabel(cm)),
-					Detail: strings.Join(parts, ", ")})
+				out = append(out, Finding{Sev: bump(2), Family: f.ID, Msg: "combo.costly",
+					Args: map[string]any{"pct": r.Pct, "share": r.Share[cm], "m": cm, "parts": parts}})
 			}
 		}
 	}
 
-	// 4) variações de declaração (plan cache pollution)
+	// 4) parameter declaration variations (plan cache pollution)
 	if len(d.Decls) > 1 {
-		out = append(out, Finding{Sev: bump(1), Family: f.ID,
-			Title:      fmt.Sprintf("%d declarações de parâmetros diferentes para a mesma query", len(d.Decls)),
-			Detail:     "Tipos ou tamanhos variam entre chamadas (ex.: nvarchar(5) × nvarchar(4000)). Cada variação gera um plano separado no cache.",
-			Suggestion: "Padronize tipo/tamanho dos parâmetros no driver/aplicação."})
+		out = append(out, Finding{Sev: bump(1), Family: f.ID, Msg: "decls", Args: map[string]any{"count": len(d.Decls)}})
 	}
 
-	// 5) listas IN inline
+	// 5) inline IN lists
 	for _, ps := range d.Params {
-		if ps.Pseudo != pseudoInVals {
+		if ps.Pseudo != pseudoInVals || ps.Distinct <= 1 {
 			continue
 		}
-		if ps.Distinct > 1 {
-			sev := 1
-			if ps.Distinct >= 20 {
-				sev = 2
-			}
-			out = append(out, Finding{Sev: bump(sev), Family: f.ID,
-				Title:      fmt.Sprintf("%s: %s listas de valores distintas", ps.Name, dec(itoa(ps.Distinct))),
-				Detail:     "Como os valores vão inline no texto, cada lista diferente gera um texto SQL distinto e uma compilação própria (cache bloat, CPU de compilação).",
-				Suggestion: "Avalie passar a lista como parâmetro (STRING_SPLIT/TVP/JSON) ou, no OutSystems, uma tabela de apoio com EXISTS."})
+		sev := 1
+		if ps.Distinct >= 20 {
+			sev = 2
 		}
+		out = append(out, Finding{Sev: bump(sev), Family: f.ID, Msg: "inlist.distinct",
+			Args: map[string]any{"name": ps.Name, "count": ps.Distinct}})
 	}
 	for _, ps := range d.Params {
 		if ps.Pseudo != pseudoInCnt {
@@ -880,10 +785,18 @@ func (e *Engine) findings(f *Family, d *FamilyDetail, fa Agg) []Finding {
 			}
 		}
 		if maxN >= 500 {
-			out = append(out, Finding{Sev: bump(1), Family: f.ID,
-				Title:  fmt.Sprintf("%s chega a %d itens", strings.TrimPrefix(ps.Name, "#itens "), maxN),
-				Detail: "Listas IN grandes aumentam o custo de compilação e degradam a estimativa de cardinalidade."})
+			out = append(out, Finding{Sev: bump(1), Family: f.ID, Msg: "inlist.size",
+				Args: map[string]any{"name": strings.TrimPrefix(ps.Name, inCountPfx), "max": maxN}})
 		}
 	}
 	return out
+}
+
+// kvLess ordena por contagem decrescente e, no empate, pela chave (ordem determinística,
+// igual à do motor JS).
+func kvLess(a, b KV) bool {
+	if a.V != b.V {
+		return a.V > b.V
+	}
+	return a.K < b.K
 }

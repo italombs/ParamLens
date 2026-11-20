@@ -32,7 +32,7 @@ func NormalizeSQL(sql string, allLiterals bool) (string, []InList) {
 		if t.Is("IN") && i+1 < len(toks) && toks[i+1].IsOp("(") {
 			if vals, end, ok := readLiteralList(toks, i+2); ok {
 				lbl, not := labelBefore(toks, i)
-				sort.Slice(vals, func(a, b int) bool { return lessValue(vals[a], vals[b]) })
+				sort.SliceStable(vals, func(a, b int) bool { return lessValue(vals[a], vals[b]) })
 				lists = append(lists, InList{Label: lbl, Not: not, Count: len(vals), Values: ClipValue(strings.Join(vals, ","))})
 				write("IN (#lista)")
 				i = end

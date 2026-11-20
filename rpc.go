@@ -31,7 +31,7 @@ type rpcArg struct {
 	strVal string
 }
 
-var errNotExec = errors.New("não é uma chamada EXEC")
+var errNotExec = errors.New("not an EXEC call")
 
 // ParseRPC interpreta textos como:
 //
@@ -70,7 +70,7 @@ func ParseRPC(stmt string) (*RPC, error) {
 		break
 	}
 	if len(nameParts) == 0 {
-		return nil, errors.New("EXEC sem nome de procedimento")
+		return nil, errors.New("EXEC without a procedure name")
 	}
 	proc := strings.Join(nameParts, ".")
 	last := strings.ToLower(nameParts[len(nameParts)-1])
@@ -269,7 +269,7 @@ func bindParams(decl string, args []rpcArg) []Param {
 	}
 	for k := range params {
 		if !set[k] {
-			params[k].Value = "(sem valor)"
+			params[k].Value = noValue
 		}
 	}
 	return append(params, extra...)

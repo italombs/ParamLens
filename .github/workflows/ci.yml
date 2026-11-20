@@ -16,7 +16,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - run: go mod tidy
       - run: go vet ./...
       - run: go test ./...
       - run: GOOS=windows GOARCH=amd64 go build -o /dev/null .
+      - name: Go × JS engine parity
+        run: |
+          PARAMLENS_PARITY_DIR=build/parity go test -count=1 -run TestParityFixtures .
+          node tools/parity.js build/parity
