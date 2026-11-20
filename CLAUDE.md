@@ -1,7 +1,7 @@
 # ParamLens — context for Claude Code
 
 ## What it is
-A DBA tool (Italo Mesquita, Data Power's). It reads `rpc_completed` Extended Events (from a table, a
+A DBA tool by Italo Mesquita. It reads `rpc_completed` Extended Events (from a table, a
 `.xel` file or an exported TSV file), parses each `exec sp_executesql ...` and shows how the application
 calls each query: parameter value distributions, combinations, cost per pattern and, above all,
 *catch-all* predicates like `@p = 0 OR col = @p` that become a *pass-through* in most executions

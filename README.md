@@ -102,6 +102,43 @@ on the host, use `host.docker.internal` as the server.
 | `tools/parity.js`, `parity_test.go` | Go × JS parity test |
 | `tools/ui-smoke.js` | UI test in a real Chromium (Playwright) |
 
+## Contributing
+
+Contributions are welcome: bug reports, parser cases from real captures, translations and code.
+
+1. **Open an issue first** for anything beyond a small fix, describing the problem or the idea.
+   When reporting a statement that is parsed wrongly, **remove sensitive data** (patient IDs, names,
+   values) and keep only the shape of the call.
+2. Fork the repository and create a branch from `main`.
+3. Make the change following the rules below, then run the checks.
+4. Open a pull request against `main` explaining what changed and why. CI must pass.
+
+Rules:
+
+- Everything in the repository is in **English**: code, identifiers, comments, docs, commit messages
+  and pull requests.
+- **The engine exists twice** (Go and `web/engine.js`). Any change to parsing, normalization,
+  statistics or findings must be made in both, with a test case in `parse_test.go` (and, when it
+  affects the output, in `parityExtraRows` in `parity_test.go`), and the parity test must pass.
+- **UI text** lives only in the dictionaries in `web/index.html`: add every new key to both `en` and
+  `pt-BR`. Engines emit ids and raw values (`msg` + `args`), never sentences.
+- **No external dependencies** in the front end (no CDN, no npm packages): the page must open offline.
+- `web/engine.js` is inlined into the page, so it must not contain `</script` or `<!--`
+  (`TestAssembledHTML` checks it).
+- No telemetry and no network calls: the data analyzed is often sensitive.
+
+Checks to run before opening the pull request (Docker works if you have no local Go/Node):
+
+```bash
+go vet ./...
+go test ./...
+PARAMLENS_PARITY_DIR=build/parity go test -run TestParityFixtures .
+node tools/parity.js build/parity
+# optional, UI in a real browser (needs Playwright):
+go build -o build/paramlens . && ./build/paramlens -write-html build/ParamLens.html
+node tools/ui-smoke.js build/ParamLens.html build/parity/export.tsv build/paramlens
+```
+
 ## Code signing
 
 Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
@@ -109,4 +146,4 @@ See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
 
 ## License
 
-[MIT](LICENSE) © 2026 Italo Mesquita — [Data Power's](#)
+[MIT](LICENSE) © 2026 Italo Mesquita
