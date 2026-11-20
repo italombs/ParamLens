@@ -6,6 +6,8 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-20
+
 ### Changed
 - Sample data, input placeholders, default table name and documentation now use a fictitious
   orders/customers/invoices domain.
@@ -49,7 +51,8 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 - First release: `ParamLens.exe`, parameter profiling of `rpc_completed` captures from a table or a
   `.xel` file, with catch-all detection, call shapes, combinations, findings and an exportable report.
 
-[Unreleased]: https://github.com/italombs/ParamLens/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/italombs/ParamLens/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/italombs/ParamLens/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/italombs/ParamLens/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/italombs/ParamLens/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/italombs/ParamLens/compare/v1.0.0...v1.1.0
