@@ -205,7 +205,7 @@ ol.steps li{margin:2px 0}
 
     <h3 data-i18n="src.filters"></h3>
     <label class="f"><span data-i18n="src.like"></span>
-      <input type="text" id="sLike" placeholder="%MESSAGEIN%MESSAGETYPE%ASSIGNEETYPEID%"></label>
+      <input type="text" id="sLike" placeholder="%SALESORDER%CUSTOMER%"></label>
     <label class="f"><span data-i18n="src.where"></span>
       <textarea id="sWhere" rows="2" placeholder="[timestamp] >= '2026-11-19'"></textarea></label>
     <div class="row">
@@ -237,7 +237,7 @@ ol.steps li{margin:2px 0}
       <label class="f"><span data-i18n="file.event"></span><input type="text" id="fEvent" value="rpc_completed"></label>
     </div>
     <label class="f"><span data-i18n="file.like"></span>
-      <input type="text" id="fLike" placeholder="%MESSAGEIN%MESSAGETYPE%"></label>
+      <input type="text" id="fLike" placeholder="%SALESORDER%CUSTOMER%"></label>
     <label class="chk"><input type="checkbox" id="fNormLit"> <span data-i18n="src.normLit"></span></label>
     <div class="row" style="margin-top:10px"><button class="btn primary nf" id="btnFileAnalyze" disabled data-i18n="src.analyze"></button><div id="fMsg"></div></div>
     <p class="hint" style="margin-top:14px" data-i18n="file.private"></p>
@@ -253,7 +253,7 @@ ol.steps li{margin:2px 0}
     <div id="expTable" class="hidden">
       <div class="row">
         <label class="f"><span data-i18n="src.db"></span><input type="text" id="eDb" placeholder="DBA"></label>
-        <label class="f"><span data-i18n="src.tbl"></span><input type="text" id="eTable" value="dbo.__xe_event_file"></label>
+        <label class="f"><span data-i18n="src.tbl"></span><input type="text" id="eTable" value="dbo.xe_events"></label>
       </div>
       <div class="maps" id="expCols"></div>
       <label class="chk"><input type="checkbox" id="eOnlyRpc" checked> <span data-i18n="exp.onlyRpc"></span></label>
@@ -265,7 +265,7 @@ ol.steps li{margin:2px 0}
       <label class="f hidden" id="eUserL"><span data-i18n="conn.user"></span><input type="text" id="eUser" autocomplete="off"></label>
     </div>
     <div class="row">
-      <label class="f"><span data-i18n="exp.like"></span><input type="text" id="eLike" placeholder="%MESSAGEIN%"></label>
+      <label class="f"><span data-i18n="exp.like"></span><input type="text" id="eLike" placeholder="%SALESORDER%"></label>
       <label class="f"><span data-i18n="src.top"></span><input type="number" id="eTop" value="0" min="0"></label>
     </div>
     <label class="f"><span data-i18n="exp.out"></span><input type="text" id="eOut" value="C:\temp\paramlens-events.tsv"></label>
@@ -1185,7 +1185,7 @@ OPTION (MAXDOP 1);`;
        ${num("duration")}, ${num("cpu")}, ${num("reads")},
        ${num("physical")}, ${num("writes")}, ${num("rows")},
        ${E(`CAST(${stmt} AS nvarchar(max))`)}
-FROM ${qTable($("#eTable").value.trim() || "dbo.__xe_event_file")}
+FROM ${qTable($("#eTable").value.trim() || "dbo.xe_events")}
 WHERE ${where.join("\n  AND ")}
 OPTION (MAXDOP 1);`;
 }

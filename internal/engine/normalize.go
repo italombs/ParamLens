@@ -7,7 +7,7 @@ import (
 
 // InList é uma lista IN (...) de literais encontrada no SQL interno.
 type InList struct {
-	Label  string // coluna/expressão antes do IN, ex.: [ENMESSAGE].[MESSAGETYPEID]
+	Label  string // column/expression before the IN, e.g. [ENORDER].[ORDERTYPEID]
 	Not    bool
 	Count  int
 	Values string // valores ordenados, separados por vírgula

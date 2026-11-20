@@ -337,32 +337,32 @@ func RunSQL(ctx context.Context, c ConnReq, s SourceReq, emit func(engine.Row)) 
 	return rows.Err()
 }
 
-// ---------------- modo demo (dados sintéticos estilo OutSystems) ----------------
+// ---------------- demo mode (synthetic, fictitious OutSystems-style data) ----------------
 
 func RunDemo(ctx context.Context, n int, emit func(engine.Row)) error {
 	if n <= 0 {
 		n = 20000
 	}
 	rnd := rand.New(rand.NewSource(42))
-	inbox := `SELECT count(1) FROM {MESSAGEIN} [ENMESSAGEIN] INNER JOIN {MESSAGETYPE} [ENMESSAGETYPE] ON ([ENMESSAGEIN].[MESSAGETYPEID] = [ENMESSAGETYPE].[ID])
-LEFT JOIN {MESSAGEINREAD} [ENMESSAGEINREAD] ON ([ENMESSAGEINREAD].[MESSAGEINID] = [ENMESSAGEIN].[ID] AND [ENMESSAGEINREAD].[ORGANIZATIONUSERID] = @qploOrganizationUserId)
-LEFT JOIN {PATIENT} [ENPATIENT] ON ([ENPATIENT].[ID] = [ENMESSAGEIN].[PATIENTID])
-LEFT JOIN {TASK} [ENTASK] ON ([ENTASK].[MESSAGEINID] = [ENMESSAGEIN].[ID])
-WHERE ([ENMESSAGEIN].[ORGANIZATIONID] = @qploOrganizationId)
- AND ([ENMESSAGEIN].[MESSAGETYPEID] IN (%s))
- AND (@qploDropdownAssigneeId = 0 OR [ENTASK].[ASSIGNEEID] = @qploDropdownAssigneeId)
- AND (@qpboIsMyGroup = 0 OR [ENTASK].[ASSIGNEEID] IN (%s))
- AND (@qpdaStartDate = @qpdaNullDate OR [ENMESSAGEIN].[CREATEDON] >= @qpdaStartDate)
- AND (@qpdaEndDate = @qpdaNullDate OR [ENMESSAGEIN].[CREATEDON] < @qpdaEndDate)
- AND (@qpboUnreadOnly = 0 OR [ENMESSAGEINREAD].[ID] IS NULL)
- AND (@qpstGPOfRegistration_AGB = N'' OR [ENPATIENT].[GPAGB] = @qpstGPOfRegistration_AGB)
- AND [ENMESSAGEIN].[MESSAGESTATEID] <> @qpinMessageStateIdAutomaticProcessing`
-	decl := `@qploOrganizationUserId bigint,@qploOrganizationId bigint,@qploDropdownAssigneeId bigint,@qpboIsMyGroup bit,@qpdaStartDate datetime,@qpdaNullDate datetime,@qpdaEndDate datetime,@qpboUnreadOnly bit,@qpstGPOfRegistration_AGB nvarchar(%d),@qpinMessageStateIdAutomaticProcessing int`
-	episodes := `SELECT TOP (@qpinMaxRecords) [ENDOC].[ID], [ENDOC].[TITLE] FROM {DOCUMENT} [ENDOC]
-WHERE [ENDOC].[OWNERTYPEID] = @qpinOwnerTypeIdPatient AND [ENDOC].[PATIENTID] = @qploEncounter_PatientId
- AND (@qpboAllEpisodes = 1 OR [ENDOC].[EPISODEID] = @qploEpisodeID)
- AND [ENDOC].[IMPORTANCE] IN (@qpinImportance_Regular, @qpinImportance_High)
-ORDER BY [ENDOC].[CREATEDON] DESC`
+	ordersSQL := `SELECT count(1) FROM {SALESORDER} [ENSALESORDER] INNER JOIN {ORDERTYPE} [ENORDERTYPE] ON ([ENSALESORDER].[ORDERTYPEID] = [ENORDERTYPE].[ID])
+LEFT JOIN {ORDERVIEW} [ENORDERVIEW] ON ([ENORDERVIEW].[ORDERID] = [ENSALESORDER].[ID] AND [ENORDERVIEW].[STOREUSERID] = @qploStoreUserId)
+LEFT JOIN {CUSTOMER} [ENCUSTOMER] ON ([ENCUSTOMER].[ID] = [ENSALESORDER].[CUSTOMERID])
+LEFT JOIN {SHIPMENT} [ENSHIPMENT] ON ([ENSHIPMENT].[ORDERID] = [ENSALESORDER].[ID])
+WHERE ([ENSALESORDER].[STOREID] = @qploStoreId)
+ AND ([ENSALESORDER].[ORDERTYPEID] IN (%s))
+ AND (@qploDropdownCarrierId = 0 OR [ENSHIPMENT].[CARRIERID] = @qploDropdownCarrierId)
+ AND (@qpboIsMyRegion = 0 OR [ENSHIPMENT].[CARRIERID] IN (%s))
+ AND (@qpdaStartDate = @qpdaNullDate OR [ENSALESORDER].[CREATEDON] >= @qpdaStartDate)
+ AND (@qpdaEndDate = @qpdaNullDate OR [ENSALESORDER].[CREATEDON] < @qpdaEndDate)
+ AND (@qpboUnreadOnly = 0 OR [ENORDERVIEW].[ID] IS NULL)
+ AND (@qpstCouponCode = N'' OR [ENCUSTOMER].[COUPONCODE] = @qpstCouponCode)
+ AND [ENSALESORDER].[ORDERSTATEID] <> @qpinOrderStateIdArchived`
+	decl := `@qploStoreUserId bigint,@qploStoreId bigint,@qploDropdownCarrierId bigint,@qpboIsMyRegion bit,@qpdaStartDate datetime,@qpdaNullDate datetime,@qpdaEndDate datetime,@qpboUnreadOnly bit,@qpstCouponCode nvarchar(%d),@qpinOrderStateIdArchived int`
+	invoicesSQL := `SELECT TOP (@qpinMaxRecords) [ENINVOICE].[ID], [ENINVOICE].[TITLE] FROM {INVOICE} [ENINVOICE]
+WHERE [ENINVOICE].[OWNERTYPEID] = @qpinOwnerTypeIdCustomer AND [ENINVOICE].[CUSTOMERID] = @qploCustomerId
+ AND (@qpboAllProjects = 1 OR [ENINVOICE].[PROJECTID] = @qploProjectId)
+ AND [ENINVOICE].[PRIORITY] IN (@qpinPriority_Normal, @qpinPriority_High)
+ORDER BY [ENINVOICE].[CREATEDON] DESC`
 	for i := 0; i < n; i++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -375,13 +375,13 @@ ORDER BY [ENDOC].[CREATEDON] DESC`
 			for g := 0; g < 1+rnd.Intn(6); g++ {
 				groups = append(groups, strconv.Itoa(100+rnd.Intn(40)))
 			}
-			assignee := 0
+			carrier := 0
 			if rnd.Intn(100) < 9 {
-				assignee = 5000 + rnd.Intn(300)
+				carrier = 5000 + rnd.Intn(300)
 			}
-			myGroup := 0
+			myRegion := 0
 			if rnd.Intn(100) < 30 {
-				myGroup = 1
+				myRegion = 1
 			}
 			start, end := "1900-01-01 00:00:00", "1900-01-01 00:00:00"
 			if rnd.Intn(100) < 15 {
@@ -392,19 +392,19 @@ ORDER BY [ENDOC].[CREATEDON] DESC`
 			if rnd.Intn(100) < 40 {
 				unread = 1
 			}
-			agb := "N''"
+			coupon := "N''"
 			if rnd.Intn(100) < 3 {
-				agb = fmt.Sprintf("N'%08d'", rnd.Intn(99999999))
+				coupon = fmt.Sprintf("N'%08d'", rnd.Intn(99999999))
 			}
-			sqlTxt := fmt.Sprintf(inbox, types, strings.Join(groups, ","))
+			sqlTxt := fmt.Sprintf(ordersSQL, types, strings.Join(groups, ","))
 			declLen := 4000
 			if rnd.Intn(100) < 10 {
 				declLen = 8
 			}
-			stmt := fmt.Sprintf("exec sp_executesql N'%s',N'%s',@qploOrganizationUserId=%d,@qploOrganizationId=%d,@qploDropdownAssigneeId=%d,@qpboIsMyGroup=%d,@qpdaStartDate='%s',@qpdaNullDate='1900-01-01 00:00:00',@qpdaEndDate='%s',@qpboUnreadOnly=%d,@qpstGPOfRegistration_AGB=%s,@qpinMessageStateIdAutomaticProcessing=6",
-				strings.ReplaceAll(sqlTxt, "'", "''"), fmt.Sprintf(decl, declLen), 1000+rnd.Intn(800), []int{12, 12, 12, 15, 31}[rnd.Intn(5)], assignee, myGroup, start, end, unread, agb)
+			stmt := fmt.Sprintf("exec sp_executesql N'%s',N'%s',@qploStoreUserId=%d,@qploStoreId=%d,@qploDropdownCarrierId=%d,@qpboIsMyRegion=%d,@qpdaStartDate='%s',@qpdaNullDate='1900-01-01 00:00:00',@qpdaEndDate='%s',@qpboUnreadOnly=%d,@qpstCouponCode=%s,@qpinOrderStateIdArchived=6",
+				strings.ReplaceAll(sqlTxt, "'", "''"), fmt.Sprintf(decl, declLen), 1000+rnd.Intn(800), []int{12, 12, 12, 15, 31}[rnd.Intn(5)], carrier, myRegion, start, end, unread, coupon)
 			reads := int64(800 + rnd.Intn(400))
-			if assignee != 0 {
+			if carrier != 0 {
 				reads = int64(120000 + rnd.Intn(60000))
 			}
 			if start != "1900-01-01 00:00:00" {
@@ -417,15 +417,15 @@ ORDER BY [ENDOC].[CREATEDON] DESC`
 			ep := "NULL"
 			if rnd.Intn(100) < 25 {
 				all = 0
-				ep = fmt.Sprintf("N'EP%06d'", rnd.Intn(999999))
+				ep = fmt.Sprintf("N'PR%06d'", rnd.Intn(999999))
 			}
-			stmt := fmt.Sprintf("exec sp_executesql N'%s',N'@qpinMaxRecords int,@qpinOwnerTypeIdPatient int,@qploEncounter_PatientId bigint,@qpboAllEpisodes bit,@qploEpisodeID nvarchar(4000),@qpinImportance_Regular int,@qpinImportance_High int',@qpinMaxRecords=50,@qpinOwnerTypeIdPatient=1,@qploEncounter_PatientId=%d,@qpboAllEpisodes=%d,@qploEpisodeID=%s,@qpinImportance_Regular=1,@qpinImportance_High=2",
-				strings.ReplaceAll(episodes, "'", "''"), 100000+rnd.Intn(50000), all, ep)
+			stmt := fmt.Sprintf("exec sp_executesql N'%s',N'@qpinMaxRecords int,@qpinOwnerTypeIdCustomer int,@qploCustomerId bigint,@qpboAllProjects bit,@qploProjectId nvarchar(4000),@qpinPriority_Normal int,@qpinPriority_High int',@qpinMaxRecords=50,@qpinOwnerTypeIdCustomer=1,@qploCustomerId=%d,@qpboAllProjects=%d,@qploProjectId=%s,@qpinPriority_Normal=1,@qpinPriority_High=2",
+				strings.ReplaceAll(invoicesSQL, "'", "''"), 100000+rnd.Intn(50000), all, ep)
 			reads := int64(40 + rnd.Intn(30))
 			r = engine.Row{Stmt: stmt}
 			r.M = engine.Metrics{reads * 30, reads * 10, reads, 0, 0, int64(rnd.Intn(50))}
 		case x < 99:
-			stmt := fmt.Sprintf("exec [dbo].[usp_GetPatientTimeline] @PatientId=%d,@FromDate='2026-%02d-01',@IncludeArchived=%d", 100000+rnd.Intn(50000), 1+rnd.Intn(11), rnd.Intn(2))
+			stmt := fmt.Sprintf("exec [dbo].[usp_GetCustomerHistory] @CustomerId=%d,@FromDate='2026-%02d-01',@IncludeArchived=%d", 100000+rnd.Intn(50000), 1+rnd.Intn(11), rnd.Intn(2))
 			r = engine.Row{Stmt: stmt}
 			r.M = engine.Metrics{int64(5000 + rnd.Intn(5000)), int64(2000 + rnd.Intn(2000)), int64(300 + rnd.Intn(300)), 0, 0, 10}
 		default:

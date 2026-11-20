@@ -29,7 +29,7 @@ async function checkResults(page, label, { samples }) {
   const nFind = await page.$$eval("#tFindings .find", els => els.length);
   check(nFind >= 30, `${label}: findings listed (${nFind})`);
   const f0 = await page.textContent("#tFindings .find .tt");
-  check(/^Catch-all: @qploDropdownAssigneeId = 0 is true in 90\.\d% of executions$/.test(f0), `${label}: finding text built by the UI (${f0})`);
+  check(/^Catch-all: @qploDropdownCarrierId = 0 is true in 90\.\d% of executions$/.test(f0), `${label}: finding text built by the UI (${f0})`);
   await page.click("#famList .fam");
   await page.waitForSelector("#tFamily:not(.hidden) #ptab");
   const params = await page.$$eval("#ptab tr.click", els => els.length);
@@ -77,7 +77,7 @@ async function checkResults(page, label, { samples }) {
   await page.fill("#eDb", "DBA");
   const bcp2 = await page.textContent("#expBcp");
   const sql2 = await page.textContent("#expSql");
-  check(/FROM \[dbo\]\.\[__xe_event_file\] WHERE \[statement\] IS NOT NULL AND \[name\] = N'rpc_completed'/.test(bcp2) && /-S SRV01\\INST -d DBA -T -w$/.test(bcp2), "html: bcp for the table");
+  check(/FROM \[dbo\]\.\[xe_events\] WHERE \[statement\] IS NOT NULL AND \[name\] = N'rpc_completed'/.test(bcp2) && /-S SRV01\\INST -d DBA -T -w$/.test(bcp2), "html: bcp for the table");
   check(sql2.includes("REPLACE(REPLACE(REPLACE(REPLACE(CAST([statement] AS nvarchar(max)), N'\\', N'\\\\'), NCHAR(13), N'\\r'), NCHAR(10), N'\\n'), NCHAR(9), N'\\t')"), "html: statement escaping in the query");
   await page.screenshot({ path: path.join(shots, "1-file.png"), fullPage: true });
 
@@ -115,7 +115,7 @@ async function checkResults(page, label, { samples }) {
   await page.selectOption("#langSel", "pt-BR");
   check((await page.getAttribute("html", "lang")) === "pt-BR" && /Todos os achados/.test(await page.textContent("#mainTabs")), "pt-BR: interface translated");
   const f0pt = await page.textContent("#tFindings .find .tt");
-  check(/^Catch-all: @qploDropdownAssigneeId = 0 é verdadeiro em 90,\d% das execuções$/.test(f0pt), `pt-BR: finding translated with pt-BR numbers (${f0pt})`);
+  check(/^Catch-all: @qploDropdownCarrierId = 0 é verdadeiro em 90,\d% das execuções$/.test(f0pt), `pt-BR: finding translated with pt-BR numbers (${f0pt})`);
   check(/Execuções/.test(await page.textContent("#totKpis")), "pt-BR: KPIs");
   await page.click("#mainTabs button[data-v=fails]");
   check(/não é uma chamada EXEC/.test(await page.textContent("#tFails")) && /Ignoradas: evento sp_statement_completed/.test(await page.textContent("#tFails")), "pt-BR: failure reasons and file info");

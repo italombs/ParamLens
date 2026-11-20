@@ -6,6 +6,13 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 
 ## [Unreleased]
 
+### Changed
+- Sample data, input placeholders, default table name and documentation now use a fictitious
+  orders/customers/invoices domain.
+
+### Removed
+- The historical hand-written analysis query (`docs/history/manual-query.sql`).
+
 ## [1.3.0] - 2026-11-20
 
 ### Changed

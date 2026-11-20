@@ -81,7 +81,7 @@ SELECT CAST([name] AS nvarchar(60)),
        TRY_CAST([duration] AS bigint), TRY_CAST([cpu_time] AS bigint), TRY_CAST([logical_reads] AS bigint),
        TRY_CAST([physical_reads] AS bigint), TRY_CAST([writes] AS bigint), TRY_CAST([row_count] AS bigint),
        REPLACE(REPLACE(REPLACE(REPLACE(CAST([statement] AS nvarchar(max)), N'\', N'\\'), NCHAR(13), N'\r'), NCHAR(10), N'\n'), NCHAR(9), N'\t')
-FROM [dbo].[__xe_event_file]
+FROM [dbo].[xe_events]
 WHERE [statement] IS NOT NULL
   AND [name] = N'rpc_completed'
 OPTION (MAXDOP 1);

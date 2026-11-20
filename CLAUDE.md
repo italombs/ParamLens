@@ -7,8 +7,12 @@ calls each query: parameter value distributions, combinations, cost per pattern 
 *catch-all* predicates like `@p = 0 OR col = @p` that become a *pass-through* in most executions
 (typical OutSystems case: optional ORs, LEFT JOIN that could be NOT EXISTS, inline IN lists).
 
-It replaces the manual query in `docs/query-manual-original.sql` (CHARINDEX + STRING_SPLIT), which broke
-on commas inside strings, `',@` inside the SQL, multiple IN lists, etc.
+It replaces a hand-written analysis query (CHARINDEX + STRING_SPLIT), which broke on commas inside
+strings, `',@` inside the SQL, multiple IN lists, etc.
+
+**Never put names from the user's environment in the repository** (tables, columns, parameters, server
+or database names, sample values): placeholders, demo data, docs and tests use the fictitious
+orders/customers/invoices domain. Real captures stay in `sample/` (git-ignored).
 
 ## User requirements
 - A single Windows `.exe`, nothing to install (SQLQueryStress style), plus a standalone `.html`
@@ -69,11 +73,10 @@ matched by name, RFC 4180 quoting, separator detected; `detectFormat`/`forEachRe
   `v1.1.0` (exe + html + i18n). Every release keeps its assets; README links `releases/latest/download/`.
 - Unit tests, parity test (6k and 400k rows; TSV and CSV, UTF-8/UTF-16) and the UI smoke test
   (Playwright, both languages) pass. JS engine: ~40 s / 400k events / 1.1 GB file in Node, ~230 MB heap (Go: ~17 s).
-- The user's real event table `dbo.__xe_event_file` (an SSMS XEvent "export to table") has 37 columns,
-  among them `name`, `timestamp (UTC)`, `duration`, `cpu_time`, `logical_reads`, `physical_reads`,
-  `writes`, `row_count`, `statement`, `sql_text`, and mixes `rpc_completed`, `sp_statement_completed`
-  and `sql_statement_completed`. A `TOP 1000` CSV sample (kept locally in `sample/`, git-ignored: it holds
-  patient data — never commit or print its values) parses 70/70 rpc events in the JS engine.
+- The user's event table is an SSMS XEvent "export to table" (standard columns such as `name`,
+  `timestamp (UTC)`, `duration`, `cpu_time`, `logical_reads`, `statement`) mixing `rpc_completed`,
+  `sp_statement_completed` and `sql_statement_completed`. A CSV sample of it (kept locally in `sample/`,
+  git-ignored: it holds sensitive data — never commit or print its values) parses 70/70 rpc events.
 - **The `.exe` has never run against a real SQL Server.** Validate first: connection (Windows/SQL auth,
   named instance, encrypt), table/column listing, table source query, `.xel` query.
 - The generated export queries/bcp command were not yet run on the real server.
