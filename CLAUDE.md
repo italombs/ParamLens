@@ -44,8 +44,9 @@ Métrica de custo padrão: logical reads → CPU → duração (a primeira dispo
   (25k e 400k linhas: ~17 s, ~245 MB RAM) e a UI foi validada no Chrome headless.
 - **Nunca rodou contra um SQL Server real.** Pontos a validar primeiro: conexão (Windows/SQL auth,
   instância nomeada, encrypt), listagem de tabelas/colunas, query da fonte tabela, query do `.xel`.
-- `go.sum` ainda não foi gerado (rodar `go mod tidy` e commitar).
-- `OWNER` em `go.mod` e `CODE_SIGNING_POLICY.md` deve ser trocado pelo usuário do GitHub.
+- Módulo: `github.com/italombs/ParamLens`; `go.sum` gerado e commitado.
+- A máquina de desenvolvimento não tem Go: usar o `Dockerfile` (`docker build --target export --output dist .`
+  gera o `.exe` rodando vet + testes; a imagem padrão roda a UI com `-bind 0.0.0.0`, só auth SQL).
 - No PC da empresa o `.exe` não assinado é bloqueado pelo SmartScreen **sem** opção "Run anyway".
 
 ## Próximos passos

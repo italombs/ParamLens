@@ -44,20 +44,22 @@ var (
 func main() {
 	port := flag.Int("port", 0, "porta local (0 = automática)")
 	noBrowser := flag.Bool("no-browser", false, "não abrir o navegador")
+	bind := flag.String("bind", "127.0.0.1", "endereço de escuta (0.0.0.0 só dentro de container, publicando a porta em 127.0.0.1)")
 	flag.Parse()
 
 	b := make([]byte, 16)
 	rand.Read(b)
 	token = hex.EncodeToString(b)
 
-	ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(*port))
+	ln, err := net.Listen("tcp", net.JoinHostPort(*bind, strconv.Itoa(*port)))
 	if err != nil {
 		fmt.Println("Não foi possível abrir a porta local:", err)
 		waitExit()
 		return
 	}
 	addr := ln.Addr().String()
-	u := "http://" + addr + "/?t=" + token
+	_, lport, _ := net.SplitHostPort(addr)
+	u := "http://127.0.0.1:" + lport + "/?t=" + token
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", serveIndex)

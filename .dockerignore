@@ -1,0 +1,7 @@
+.git
+.github
+dist
+signed
+*.exe
+*.syso
+*.tmp

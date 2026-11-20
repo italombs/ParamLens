@@ -52,7 +52,18 @@ go test ./...
 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o ParamLens.exe .
 ```
 
-Opções de linha de comando: `-port 8080` (porta fixa) e `-no-browser`.
+Opções de linha de comando: `-port 8080` (porta fixa), `-no-browser` e `-bind` (padrão `127.0.0.1`).
+
+### Sem Go instalado (Docker)
+
+```bash
+docker build --target export --output dist .        # gera dist/ParamLens.exe (roda vet + testes)
+docker build -t paramlens .                          # imagem Linux
+docker run --rm -it -p 127.0.0.1:8765:8765 paramlens # abra o link "Interface:" do console
+```
+
+No container só funciona autenticação SQL (não Windows/SSPI); para o SQL Server do próprio host use
+`host.docker.internal` como servidor.
 
 ## Estrutura
 
