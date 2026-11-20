@@ -68,6 +68,20 @@ Run locally: `go run ./cmd/paramlens -port 8765` and use **Load sample data**.
 Command-line options: `-port` (fixed port), `-no-browser`, `-bind` (default `127.0.0.1`) and
 `-write-html <file>`.
 
+## Screenshots and the usage GIF
+
+The images in `docs/images/` (used by the README and `docs/tour.md`) come from the sample data only.
+Regenerate them after interface changes:
+
+```bash
+go build -o dist/paramlens ./cmd/paramlens && ./dist/paramlens -write-html dist/ParamLens.html
+PARAMLENS_PARITY_DIR=$PWD/dist/parity go test -count=1 -run TestParityFixtures ./internal/engine
+node scripts/docs-media.js dist/paramlens dist/ParamLens.html dist/parity/export.tsv   # needs Playwright
+ffmpeg -y -i dist/media/tour.webm -vf "fps=8,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" docs/images/tour.gif
+```
+
+Never use a real capture for documentation images.
+
 ## Docker
 
 For machines without Go:
