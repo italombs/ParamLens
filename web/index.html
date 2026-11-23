@@ -34,8 +34,9 @@ header{display:flex;align-items:center;gap:14px;padding:10px 18px;background:var
 .btn:disabled{opacity:.5;cursor:default}
 .link{background:none;border:none;color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
 select.lang{width:auto;padding:5px 8px;font-size:12.5px}
-main{padding:18px;max-width:1500px;margin:0 auto}
-.grid2{display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:16px;align-items:start}
+main{padding:18px;max-width:2000px;margin:0 auto}
+.grid2{display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:16px;align-items:start}
+.grid2 > *,.res > *{min-width:0}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
 .card h2{font-size:15px;margin:0 0 12px}
 .card h3{font-size:13.5px;margin:18px 0 8px}
@@ -57,7 +58,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);bor
 .maps{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .hidden{display:none!important}
 /* results */
-.res{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start}
+.res{display:grid;grid-template-columns:clamp(260px,24vw,380px) minmax(0,1fr);gap:16px;align-items:start}
 .side{position:sticky;top:64px;max-height:calc(100vh - 82px);display:flex;flex-direction:column;padding:0;overflow:hidden}
 .side .head{padding:12px 14px;border-bottom:1px solid var(--line)}
 .flist{overflow:auto}
@@ -90,9 +91,11 @@ code,.code{font-family:var(--mono);font-size:12px}
 .code{background:var(--soft);border-radius:6px;padding:6px 8px;display:block;margin-top:6px;white-space:pre-wrap;word-break:break-word}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-th{font-size:11.5px;color:var(--mute);font-weight:600;background:var(--soft);position:sticky;top:0}
+th{font-size:11.5px;color:var(--mute);font-weight:600;background:var(--soft);position:sticky;top:0;overflow-wrap:break-word}
+td .badge{white-space:normal}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-td.v{font-family:var(--mono);font-size:12px;word-break:break-all;max-width:420px}
+td.v{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere;max-width:420px;min-width:60px}
+td.v.nw{white-space:nowrap;overflow-wrap:normal;max-width:none}
 tr.click{cursor:pointer}
 tr.click:hover td{background:var(--soft)}
 .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;background:var(--soft);color:var(--mute);white-space:nowrap}
@@ -100,8 +103,8 @@ tr.click:hover td{background:var(--soft)}
 .badge.c-low{background:var(--accent-soft);color:var(--accent)}
 .badge.c-high{background:var(--info-soft);color:var(--info)}
 .badge.ps{background:var(--mid-soft);color:var(--mid)}
-.pbar{display:flex;align-items:center;gap:7px;min-width:130px}
-.pbar .b{flex:1;height:8px;background:var(--soft);border-radius:4px;overflow:hidden;min-width:60px}
+.pbar{display:flex;align-items:center;gap:6px;min-width:96px}
+.pbar .b{flex:1;height:8px;background:var(--soft);border-radius:4px;overflow:hidden;min-width:40px}
 .pbar .b i{display:block;height:100%;background:var(--bar)}
 .pbar .b i.c{background:var(--hi)}
 .pbar span{font-variant-numeric:tabular-nums;font-size:12px;min-width:46px;text-align:right}
@@ -125,6 +128,14 @@ pre.sql{font-family:var(--mono);font-size:12px;background:var(--soft);padding:10
 .cmdh h3{margin:0}
 ol.steps{margin:4px 0 8px;padding-left:20px;font-size:12.5px;color:var(--mute)}
 ol.steps li{margin:2px 0}
+.good{color:var(--accent);font-weight:600}
+.bad{color:var(--hi);font-weight:600}
+.cmpSel{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0 14px}
+.cmpGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.cmpGrid .card{overflow-x:auto}
+.cmpGrid .card h2{margin-bottom:8px}
+.cmpGrid .card h2::first-letter{text-transform:uppercase}
+.kpi .v.good,.kpi .v.bad{font-size:21px}
 @media (max-width:1050px){.grid2,.res{grid-template-columns:1fr}.side{position:static;max-height:420px}}
 </style>
 </head>
@@ -140,6 +151,7 @@ ol.steps li{margin:2px 0}
 </header>
 
 <main>
+<div class="find s1 hidden" id="cmpBanner" style="margin-bottom:14px"><div class="tt" id="cmpBannerT"></div><div class="dd"><button class="link" id="btnCmpCancel" data-i18n="cmp.cancel"></button></div></div>
 <!-- ================= SOURCE (SQL Server) ================= -->
 <section id="vSetup" class="grid2">
   <div class="card">
@@ -299,10 +311,11 @@ ol.steps li{margin:2px 0}
       <div class="flist" id="famList"></div>
     </div>
     <div>
-      <div class="tabs" id="mainTabs"><button data-v="findings" class="on" data-i18n="tab.findings"></button><button data-v="family" data-i18n="tab.family"></button><button data-v="fails" data-i18n="tab.fails"></button></div>
+      <div class="tabs" id="mainTabs"><button data-v="findings" class="on" data-i18n="tab.findings"></button><button data-v="family" data-i18n="tab.family"></button><button data-v="fails" data-i18n="tab.fails"></button><button data-v="compare" id="tabCompare" data-i18n="tab.compare"></button></div>
       <div id="tFindings"></div>
       <div id="tFamily" class="hidden"></div>
       <div id="tFails" class="hidden"></div>
+      <div id="tCompare" class="hidden"></div>
     </div>
   </div>
 </section>
@@ -326,6 +339,43 @@ ol.steps li{margin:2px 0}
   </div>
 </div>
 
+<div class="overlay hidden" id="pxOv">
+  <div class="modal" style="width:min(760px,94vw)">
+    <div class="row"><b class="nf" data-i18n="px.title"></b><div></div><button class="btn nf" id="btnClosePx" data-i18n="close"></button></div>
+    <p class="hint" id="pxInfo" style="margin:0"></p>
+    <div class="row">
+      <label class="f"><span data-i18n="px.rows"></span>
+        <select id="pxMode"><option value="execs" data-i18n="px.execs"></option><option value="combos" data-i18n="px.combos"></option></select></label>
+      <label class="f"><span data-i18n="px.table"></span><input type="text" id="pxTable" value="dbo.paramlens_params"></label>
+    </div>
+    <div class="seg" id="segPx" style="margin:0"><button data-v="script" class="on" data-i18n="px.script"></button><button data-v="csv">CSV</button><button data-v="db" id="pxDbTab" data-i18n="px.db"></button></div>
+    <div id="pxScript">
+      <label class="chk"><input type="checkbox" id="pxReplay" checked> <span data-i18n="px.replay"></span></label>
+      <label class="chk"><input type="checkbox" id="pxDrop"> <span data-i18n="px.drop"></span></label>
+    </div>
+    <p class="hint hidden" id="pxCsv" data-i18n="px.csvHint"></p>
+    <div id="pxDb" class="hidden">
+      <p class="hint" data-i18n="px.dbHint"></p>
+      <p class="hint" id="pxConnTxt"></p>
+      <div id="pxConnForm">
+        <div class="row">
+          <label class="f"><span data-i18n="conn.server"></span><input type="text" id="pxServer" placeholder="localhost"></label>
+          <label class="f"><span data-i18n="conn.auth"></span>
+            <select id="pxAuth"><option value="windows" data-i18n="conn.authWin"></option><option value="sql">SQL Server</option></select></label>
+        </div>
+        <div class="row hidden" id="pxSqlAuth">
+          <label class="f"><span data-i18n="conn.user"></span><input type="text" id="pxUser" autocomplete="off"></label>
+          <label class="f"><span data-i18n="conn.pass"></span><input type="password" id="pxPass" autocomplete="off"></label>
+        </div>
+        <div class="row"><button class="btn nf" id="btnPxConnect" data-i18n="conn.connect"></button><div id="pxConnMsg"></div></div>
+      </div>
+      <label class="f"><span data-i18n="src.db"></span><select id="pxDbSel" disabled><option data-i18n="src.connectFirst"></option></select></label>
+    </div>
+    <div class="row"><button class="btn primary nf" id="btnPxGo"></button><div id="pxMsg" class="hint"></div></div>
+  </div>
+</div>
+<input type="file" id="cmpFile" accept=".json,application/json" hidden>
+
 <!--STATIC-DATA-->
 <!--ENGINE-->
 <script>
@@ -333,6 +383,8 @@ ol.steps li{margin:2px 0}
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const TOKEN = new URLSearchParams(location.search).get("t") || "";
+// inside the app window of the .exe (closing the window quits)
+const APP = new URLSearchParams(location.search).get("app") === "1";
 const staticEl = document.getElementById("static-data");
 const STATIC = staticEl ? JSON.parse(staticEl.textContent) : null;
 // JS engine (web/engine.js), injected at build time; missing only if index.html is opened unassembled
@@ -342,7 +394,7 @@ let LOCAL = !STATIC && !TOKEN;
 // pristine copy of the page, used to export the report in file mode
 const PAGE_HTML = STATIC ? "" : "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
 const M = {dur:0,cpu:1,reads:2,phys:3,writes:4,rows:5};
-let ov = null, curFam = null, curDetail = null, costM = -1, connOK = false, lastConn = null;
+let ov = null, curFam = null, curDetail = null, costM = -1, connOK = false, lastConn = null, lastSI = null;
 const detailCache = {};
 
 /* ===================== i18n ===================== */
@@ -413,6 +465,34 @@ en: {
   "quit.confirm":"Quit ParamLens?", "quit.done":"ParamLens has quit. You can close this tab.", "err":"Error: ", "exportFail":"Could not export: ",
   "metrics":["duration","CPU","logical reads","physical reads","writes","rows"],
   "script.header":"-- Generated by ParamLens from a real execution",
+  "tab.compare":"Compare",
+  "px.btn":"Export parameters", "px.title":"Export the parameters of this query",
+  "px.info":"{0} executions · {1} parameter(s). The values are read again from the capture, complete (the tables cut long values at 200 bytes).",
+  "px.rows":"One row per", "px.execs":"execution", "px.combos":"distinct combination of values", "px.table":"Table (schema.name)",
+  "px.script":"SQL script", "px.db":"Insert into a database",
+  "px.replay":"Add a replay loop: sp_executesql for each row, with the application's text and parameter types (runs only after you set @run = 1)",
+  "px.drop":"Drop the table if it already exists",
+  "px.goScript":"Download script", "px.goCsv":"Download CSV", "px.goDb":"Insert rows",
+  "px.reading":"Reading the values…", "px.inserting":"Inserting {0} rows…", "px.inserted":"✓ {0} rows inserted into {1}", "px.done":"✓ {0} rows exported",
+  "px.lists":"This query has {0} inline IN list(s): their values are part of the SQL text, not parameters, so they are not exported.",
+  "px.failed":"{0} statement(s) could not be read again (their values are NULL).",
+  "px.noParams":"This query has no parameters: only the metrics will be exported.",
+  "px.connected":"Connection of the start screen: {0}", "px.connect":"Connect to the server where the table will be created:",
+  "px.csvHint":"Separator \";\", UTF-8 with BOM; NULL is an empty field and text goes without quotes or N prefix.",
+  "px.dbHint":"Creates the table if needed (columns typed by the parameter declarations) and inserts everything in one transaction.",
+  "cmp.title":"Compare performance",
+  "cmp.legend":"Changes are relative to A: negative means B is lower (better).",
+  "cmp.noBase":"Compare a query before and after a rewrite. If both runs are in this capture, compare two queries of this analysis. If the rewrite was captured separately (another table, another .xel file or an exported file), compare with another capture: this analysis is kept as A and you choose the source of B, as in a new analysis.",
+  "cmp.other":"Compare with another capture…", "cmp.inThis":"Compare two queries of this analysis", "cmp.swap":"Swap A and B",
+  "cmp.pending":"Comparison: \"{0}\" is kept as A. Choose the capture of the rewrite (table, .xel or exported file) and click Analyze.", "cmp.cancel":"Back to the results",
+  "cmp.save":"Save to a file", "cmp.load":"Load a saved capture", "cmp.clear":"Clear comparison",
+  "cmp.a":"A (original) · {0}", "cmp.b":"B (rewrite) · {0}", "cmp.opt":"{0} exec · {1}",
+  "cmp.stat":"Statistic", "cmp.change":"Change", "cmp.avg":"Average", "cmp.total":"Total", "cmp.max":"Max", "cmp.min":"Min", "cmp.execs":"Executions",
+  "cmp.lower":"{0}× lower", "cmp.higher":"{0}× higher", "cmp.same":"same",
+  "cmp.rows":"The average number of rows returned differs (A: {0} × B: {1}): check that the rewrite returns the same result.",
+  "cmp.few":"Few executions (A: {0}, B: {1}): the percentiles may not be representative.",
+  "cmp.base":"Kept capture: {0} · {1} queries · taken {2}", "cmp.badFile":"This file is not a capture saved by ParamLens.",
+  "cmp.noMetric":"The two captures have no metric in common.",
 },
 "pt-BR": {
   "sub.default":"perfil de parâmetros do rpc_completed", "sub.file":"perfil de parâmetros do rpc_completed · arquivo exportado",
@@ -480,6 +560,34 @@ en: {
   "quit.confirm":"Encerrar o ParamLens?", "quit.done":"ParamLens encerrado. Pode fechar esta aba.", "err":"Erro: ", "exportFail":"Não foi possível exportar: ",
   "metrics":["duração","CPU","logical reads","physical reads","writes","linhas"],
   "script.header":"-- Gerado pelo ParamLens a partir de uma execução real",
+  "tab.compare":"Comparar",
+  "px.btn":"Exportar parâmetros", "px.title":"Exportar os parâmetros desta query",
+  "px.info":"{0} execuções · {1} parâmetro(s). Os valores são lidos de novo da captura, completos (as tabelas cortam valores longos em 200 bytes).",
+  "px.rows":"Uma linha por", "px.execs":"execução", "px.combos":"combinação distinta de valores", "px.table":"Tabela (schema.nome)",
+  "px.script":"Script SQL", "px.db":"Inserir em uma base",
+  "px.replay":"Incluir um loop de replay: sp_executesql para cada linha, com o texto e os tipos de parâmetro da aplicação (só roda depois de você definir @run = 1)",
+  "px.drop":"Apagar a tabela se ela já existir",
+  "px.goScript":"Baixar script", "px.goCsv":"Baixar CSV", "px.goDb":"Inserir linhas",
+  "px.reading":"Lendo os valores…", "px.inserting":"Inserindo {0} linhas…", "px.inserted":"✓ {0} linhas inseridas em {1}", "px.done":"✓ {0} linhas exportadas",
+  "px.lists":"Esta query tem {0} lista(s) IN inline: os valores fazem parte do texto SQL, não são parâmetros, por isso não são exportados.",
+  "px.failed":"{0} statement(s) não puderam ser lidos de novo (os valores ficam NULL).",
+  "px.noParams":"Esta query não tem parâmetros: só as métricas serão exportadas.",
+  "px.connected":"Conexão da tela inicial: {0}", "px.connect":"Conecte no servidor onde a tabela será criada:",
+  "px.csvHint":"Separador \";\", UTF-8 com BOM; NULL é campo vazio e texto vai sem aspas nem prefixo N.",
+  "px.dbHint":"Cria a tabela se precisar (colunas tipadas pelas declarações dos parâmetros) e insere tudo em uma transação.",
+  "cmp.title":"Comparar desempenho",
+  "cmp.legend":"As variações são relativas a A: negativo significa que B é menor (melhor).",
+  "cmp.noBase":"Compare uma query antes e depois de uma reescrita. Se as duas execuções estão nesta captura, compare duas queries desta análise. Se a reescrita foi capturada à parte (outra tabela, outro arquivo .xel ou um arquivo exportado), compare com outra captura: esta análise fica como A e você escolhe a fonte de B, como numa nova análise.",
+  "cmp.other":"Comparar com outra captura…", "cmp.inThis":"Comparar duas queries desta análise", "cmp.swap":"Trocar A e B",
+  "cmp.pending":"Comparação: \"{0}\" fica como A. Escolha a captura da reescrita (tabela, .xel ou arquivo exportado) e clique em Analisar.", "cmp.cancel":"Voltar aos resultados",
+  "cmp.save":"Salvar em arquivo", "cmp.load":"Carregar captura salva", "cmp.clear":"Limpar comparação",
+  "cmp.a":"A (original) · {0}", "cmp.b":"B (reescrita) · {0}", "cmp.opt":"{0} exec · {1}",
+  "cmp.stat":"Estatística", "cmp.change":"Variação", "cmp.avg":"Média", "cmp.total":"Total", "cmp.max":"Máx", "cmp.min":"Mín", "cmp.execs":"Execuções",
+  "cmp.lower":"{0}× menor", "cmp.higher":"{0}× maior", "cmp.same":"igual",
+  "cmp.rows":"A média de linhas retornadas é diferente (A: {0} × B: {1}): confira se a reescrita devolve o mesmo resultado.",
+  "cmp.few":"Poucas execuções (A: {0}, B: {1}): os percentis podem não ser representativos.",
+  "cmp.base":"Captura guardada: {0} · {1} queries · gerada {2}", "cmp.badFile":"Este arquivo não é uma captura salva pelo ParamLens.",
+  "cmp.noMetric":"As duas capturas não têm nenhuma métrica em comum.",
 }};
 
 // ids/messages produced by the engines and the server (in English) -> pt-BR
@@ -541,11 +649,14 @@ function applyLang(){
   if(ov && !$("#vRes").classList.contains("hidden")){
     renderTotals(); renderFamList(); renderAllFindings(); renderFails();
     if(curDetail) renderFamily();
+    if(curTab()==="compare") renderCompare();
   }
+  if(!$("#pxOv").classList.contains("hidden")) pxRender();
 }
 $("#langSel").addEventListener("change", e=>{
   LANG = e.target.value; setLocale();
   try{ localStorage.setItem("paramlens.lang", LANG) }catch(err){ /* storage unavailable */ }
+  if(TOKEN) api("/api/prefs", {lang:LANG}, true).catch(()=>{});
   applyLang();
 });
 
@@ -645,8 +756,9 @@ function findingText(f){
   return fn(f.args || {}, f, L.cost);
 }
 
-async function api(path, body){
-  if(LOCAL) return localApi(path, body);
+// server = true goes to the .exe even in file mode (e.g. inserting into a database)
+async function api(path, body, server){
+  if(LOCAL && !server) return localApi(path, body);
   const opt = {headers:{"X-Token":TOKEN}};
   if(body!==undefined){opt.method="POST";opt.body=JSON.stringify(body);opt.headers["Content-Type"]="application/json"}
   const r = await fetch(path, opt);
@@ -682,7 +794,7 @@ $("#btnConnect").onclick = async ()=>{
   try{
     const c = connReq();
     const si = await api("/api/test", c);
-    lastConn = c; connOK = true;
+    lastConn = c; connOK = true; lastSI = si;
     msg.className="ok"; msg.textContent = "✓ "+(si.server||"")+" · "+si.version+" · "+si.login;
     const db = $("#sDb"); db.disabled=false;
     db.innerHTML = si.databases.map(d=>`<option ${d===si.current?"selected":""}>${esc(d)}</option>`).join("");
@@ -776,13 +888,17 @@ async function loadResults(){
   if(STATIC){ r = STATIC } else { r = await api("/api/overview") }
   ov = r.overview; costM = ov.costMetric;
   for(const k in detailCache) delete detailCache[k];
+  curDist = null; cmpSel.cur = null; PX.cache = {};
+  $("#tabCompare").classList.toggle("hidden", !!STATIC);
   hdr = {label: r.label, generated: r.generated, state: r.state};
   $("#vSetup").classList.add("hidden"); $("#vFile").classList.add("hidden"); $("#vRes").classList.remove("hidden");
   if(!STATIC){ $("#btnNew").classList.remove("hidden"); $("#btnExport").classList.remove("hidden") }
   renderHdr();
   renderTotals(); renderFamList(); renderAllFindings(); renderFails();
+  $("#cmpBanner").classList.add("hidden");
   showTab("findings");
   if(ov.families && ov.families.length) selectFamily(ov.families[0].id, false);
+  if(cmpPending && !STATIC){ cmpPending = false; showTab("compare") }
 }
 function renderTotals(){
   const tt = ov.totals, h = ov.has;
@@ -823,7 +939,10 @@ function showTab(v){
   $("#tFindings").classList.toggle("hidden", v!=="findings");
   $("#tFamily").classList.toggle("hidden", v!=="family");
   $("#tFails").classList.toggle("hidden", v!=="fails");
+  $("#tCompare").classList.toggle("hidden", v!=="compare");
+  if(v==="compare") renderCompare();
 }
+const curTab = () => $("#mainTabs button.on").dataset.v;
 $("#mainTabs").addEventListener("click", e=>{ const b=e.target.closest("button"); if(b) showTab(b.dataset.v) });
 
 function findingHTML(f, withFam){
@@ -881,13 +1000,16 @@ async function getDetail(id){
 }
 async function selectFamily(id, switchTab){
   curFam = id; lastCombo = null; renderFamList();
-  if(switchTab) showTab("family");
+  if(curTab()==="compare"){ cmpSel.cur = id; renderCompare() }
+  else if(switchTab) showTab("family");
   const el = $("#tFamily");
   el.innerHTML = `<div class="empty">${esc(t("loading"))}</div>`;
   try{ curDetail = await getDetail(id) }catch(e){ el.innerHTML = `<div class="err">${esc(e.message)}</div>`; return }
   renderFamily();
 }
 
+// value cell: short values (dates, numbers, codes) stay on one line, long ones wrap
+const vtd = v => `<td class="v${String(v).length <= 40 ? " nw" : ""}">${esc(v)}</td>`;
 function pbar(p, cost){ return `<div class="pbar"><div class="b"><i class="${cost?"c":""}" style="width:${Math.min(100,p*100).toFixed(1)}%"></i></div><span>${fP(p)}</span></div>` }
 const sampleBtn = (ix, big) => !STATIC ? `<button class="btn sm${big?" nf":""}" data-sample="${ix}">${esc(t(big?"sample.btn":"sample.btnSm"))}</button>` : "";
 
@@ -900,6 +1022,7 @@ function renderFamily(){
   const decls = d.decls||[], pats = d.patterns||[], params = d.params||[], fnd = d.findings||[];
   let html = `<div class="card" style="margin-bottom:14px">
     <div class="row"><h2 class="nf" style="margin:0">${esc(s.kind==="proc"? t("fam.proc", s.proc) : t("fam.via", s.kind))}</h2><div></div>
+      ${!STATIC?`<button class="btn sm nf" id="btnPx">${esc(t("px.btn"))}</button>`:""}
       ${sampleBtn(a.sample, true)}</div>
     <div class="kpis" style="margin-top:12px">${k.join("")}</div>
     <details><summary class="hint" style="cursor:pointer">${esc(t("fam.sql"))}${decls.length? esc(t("fam.declsN", decls.length)) : ""}</summary>
@@ -935,10 +1058,10 @@ function renderFamily(){
   ${params.map((p,i)=>{
     const top = (p.top||[])[0]||{value:"",pct:0};
     const types = p.types||[];
-    return `<tr class="click" data-p="${i}"><td class="v">${esc(tv(p.name))} ${p.pseudo?`<span class="badge ps">${esc(t(p.pseudo==="in-values"?"par.inList":"par.inSize"))}</span>`:""}</td>
+    return `<tr class="click" data-p="${i}"><td class="v nw">${esc(tv(p.name))} ${p.pseudo?`<span class="badge ps">${esc(t(p.pseudo==="in-values"?"par.inList":"par.inSize"))}</span>`:""}</td>
       <td class="v">${esc(p.type)}${types.length>1?` <span class="badge" title="${esc(types.map(x=>x.k+": "+x.v).join("\n"))}">${esc(t("par.types", types.length-1))}</span>`:""}</td>
       <td><span class="badge c-${p.card}">${esc(t("card."+p.card))}</span></td><td class="n">${fN(p.distinct)}${p.overflow?"+":""}</td>
-      <td class="v">${esc(tv(top.value))}</td><td>${pbar(top.pct)}</td><td class="n">${p.nullPct?fP(p.nullPct):"–"}</td></tr>
+      ${vtd(tv(top.value))}<td>${pbar(top.pct)}</td><td class="n">${p.nullPct?fP(p.nullPct):"–"}</td></tr>
       <tr class="sub-t hidden" id="pd${i}"><td colspan="7"></td></tr>`}).join("")}
   </table></div></div>`;
 
@@ -956,7 +1079,7 @@ function renderFamily(){
 
 function valueRows(list){
   const cm = costM;
-  return list.map(v=>`<tr><td class="v">${esc(tv(v.value))}</td><td class="n">${fN(v.agg.count)}</td><td>${pbar(v.pct)}</td>
+  return list.map(v=>`<tr>${vtd(tv(v.value))}<td class="n">${fN(v.agg.count)}</td><td>${pbar(v.pct)}</td>
     ${cm>=0?`<td>${pbar(v.share[cm],true)}</td><td class="n">${fM(cm,avg(v.agg,cm))}</td>`:""}
     <td>${sampleBtn(v.agg.sample)}</td></tr>`).join("");
 }
@@ -995,7 +1118,7 @@ function renderCombos(c){
       <button class="btn sm nf" id="btnCsv">${esc(t("cmb.csv"))}</button></div>
     <div class="scroll"><table><tr>${c.params.map((p,i)=>`<th>${esc(tv(p))}${c.modes[i]==="class"?` <span class="badge c-high">${esc(t("cmb.class"))}</span>`:""}</th>`).join("")}
     <th class="n">${esc(t("col.execs"))}</th><th>${esc(t("col.pctExecs"))}</th>${cm>=0?`<th>${esc(t("col.pctCost"))}</th><th class="n">${esc(t("col.mAvg", MNAME()[cm]))}</th>`:""}<th></th></tr>
-    ${c.rows.map(r=>`<tr>${r.values.map(v=>`<td class="v">${esc(tv(v))}</td>`).join("")}<td class="n">${fN(r.agg.count)}</td><td>${pbar(r.pct)}</td>
+    ${c.rows.map(r=>`<tr>${r.values.map(v=>vtd(tv(v))).join("")}<td class="n">${fN(r.agg.count)}</td><td>${pbar(r.pct)}</td>
       ${cm>=0?`<td>${pbar(r.share[cm],true)}</td><td class="n">${fM(cm,avg(r.agg,cm))}</td>`:""}
       <td>${sampleBtn(r.agg.sample)}</td></tr>`).join("")}</table></div>`;
   $("#btnCsv").onclick = ()=>{
@@ -1032,17 +1155,287 @@ async function copyText(btn, el){
   btn.textContent = t("copied"); setTimeout(()=> btn.textContent = t("copy"), 1200);
 }
 $("#btnCopy").onclick = ()=> copyText($("#btnCopy"), $("#sampleTxt"));
-document.addEventListener("keydown", e=>{ if(e.key==="Escape") $("#sampleOv").classList.add("hidden") });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ $("#sampleOv").classList.add("hidden"); $("#pxOv").classList.add("hidden") } });
+
+/* ---------- export the parameters of a query: script, CSV or straight into a table ---------- */
+const PX_METRIC = ["duration_us","cpu_us","logical_reads","physical_reads","writes","row_count"];
+const PX = {fam:null, cache:{}, conn:null, dbs:null};
+function nowStamp(){
+  const now = new Date(), p2 = n=>String(n).padStart(2,"0");
+  return `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
+}
+// canonical literal of the engines -> {k: null | str | num | bin, v}
+function pxLit(v){
+  if(v == null || v === "NULL" || v === "DEFAULT" || v === "(absent)" || v === "(no value)") return {k:"null"};
+  if(/^'(?:[^']|'')*'$/.test(v)) return {k:"str", v:v.slice(1,-1).replace(/''/g,"'")};
+  if(/^[+-]?\$?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(v)) return {k:"num", v};
+  if(/^0x[0-9a-f]*$/i.test(v)) return {k:"bin", v};
+  return {k:"str", v}; // variables (@x) and other tokens are kept as text
+}
+// column type from the declared types: the widest of the same base type, else nvarchar(max)
+function pxType(types){
+  const ps = (types||[]).map(x=> /^([a-z][a-z0-9_]*(?: [a-z][a-z0-9_]*)?)\s*(?:\(\s*(max|\d+)\s*(?:,\s*(\d+)\s*)?\))?$/.exec(x.k.trim().toLowerCase()));
+  if(!ps.length || ps.some(p=>!p) || ps.some(p=>p[1]!==ps[0][1])) return "nvarchar(max)";
+  const base = ps[0][1];
+  if(ps.every(p=>p[2]===undefined)) return base;
+  if(ps.some(p=>p[2]==="max")) return base+"(max)";
+  if(ps.some(p=>p[3]!==undefined)){
+    const sc = Math.max(...ps.map(p=>+(p[3]||0))), ip = Math.max(...ps.map(p=>(+p[2]||0)-(+(p[3]||0))));
+    return `${base}(${Math.min(38, ip+sc)},${sc})`;
+  }
+  return `${base}(${Math.max(...ps.map(p=>+p[2]||0))})`;
+}
+function pxColumns(pt){
+  const used = new Set();
+  const uniq = n=>{ const b = n.replace(/[[\]]/g,"") || "p"; let s = b, i = 2; while(used.has(s.toLowerCase())) s = b+"_"+(i++); used.add(s.toLowerCase()); return s };
+  const ex = pt.mode === "execs";
+  const cols = [{name:uniq(ex?"exec_no":"combo_no"), type:"int", get:(r,i)=>({k:"num", v:String(i+1)})}];
+  if(!ex) cols.push({name:uniq("executions"), type:"int", get:r=>({k:"num", v:String(r.count)})});
+  pt.params.forEach((p,k)=> cols.push({name:uniq(p.name[0]==="#" ? "p"+p.name.slice(1) : p.name.replace(/^@/,"")), type:pxType(p.types), param:p.name, get:r=>pxLit(r.values[k])}));
+  pt.has.forEach((h,m)=>{ if(h) cols.push(ex
+    ? {name:uniq(PX_METRIC[m]), type:"bigint", get:r=>({k:"num", v:String(r.sum[m])})}
+    : {name:uniq("avg_"+PX_METRIC[m]), type:"decimal(19,2)", get:r=>({k:"num", v:(r.sum[m]/r.count).toFixed(2)})}) });
+  return cols;
+}
+// "schema.table" (brackets allowed) -> [schema, table]
+function pxSplitTable(s){
+  const parts = []; let cur = "", br = false;
+  for(const ch of s.trim()){
+    if(ch==="[") br = true; else if(ch==="]") br = false;
+    if(ch==="." && !br){ parts.push(cur); cur = "" } else cur += ch;
+  }
+  parts.push(cur);
+  const ps = parts.map(p=>{ p = p.trim(); return /^\[.*\]$/.test(p) ? p.slice(1,-1).replace(/\]\]/g,"]") : p }).filter(Boolean);
+  return ps.length >= 2 ? [ps[ps.length-2], ps[ps.length-1]] : ["dbo", ps[0] || "paramlens_params"];
+}
+const pxSql = x=> x.k==="null" ? "NULL" : x.k==="str" ? sqlStr(x.v) : x.v;
+function pxScript(pt, cols){
+  const [sc, tb] = pxSplitTable($("#pxTable").value), T = qn(sc)+"."+qn(tb), ex = pt.mode==="execs";
+  const fam = (ov.families||[]).find(f=>f.id===pt.family) || {title:""};
+  const L = [`-- ParamLens: parameters of one query, ${pt.rows.length} row(s), one per ${ex?"execution":"distinct combination of values"}`,
+    `-- Query: ${fam.title.replace(/\s+/g," ")}`,
+    `-- Capture: ${(hdr&&hdr.label)||""} · generated ${nowStamp()}`,
+    "-- Values exactly as sent by the application; duration and CPU in microseconds."];
+  if(pt.lists) L.push(`-- Note: ${pt.lists} inline IN list(s) are part of the SQL text and are not exported.`);
+  L.push("SET NOCOUNT ON;", "SET DATEFORMAT ymd;");
+  if($("#pxDrop").checked) L.push(`IF OBJECT_ID(${sqlStr(T)}, N'U') IS NOT NULL DROP TABLE ${T};`);
+  L.push(`IF OBJECT_ID(${sqlStr(T)}, N'U') IS NULL\nCREATE TABLE ${T} (\n  ${cols.map((c,i)=>qn(c.name)+" "+c.type+(i===0?" NOT NULL":" NULL")).join(",\n  ")}\n);`, "GO");
+  const head = `INSERT INTO ${T} (${cols.map(c=>qn(c.name)).join(", ")}) VALUES`;
+  for(let s = 0; s < pt.rows.length; s += 1000){
+    const part = [];
+    for(let i = s; i < Math.min(pt.rows.length, s+1000); i++) part.push("(" + cols.map(c=>pxSql(c.get(pt.rows[i], i))).join(", ") + ")");
+    L.push(head + "\n" + part.join(",\n") + ";", "GO");
+  }
+  if($("#pxReplay").checked){
+    const ps = cols.filter(c=>c.param), vars = ["@n", ...ps.map((c,i)=>"@v"+(i+1))];
+    // several declarations (e.g. nvarchar(20) × nvarchar(400)): the widest types, so no value is cut
+    const varied = pt.params.some(p=>(p.types||[]).length > 1);
+    const decl = varied ? ps.filter(c=>c.param[0]!=="#").map(c=>c.param+" "+c.type).join(",") : pt.decl;
+    let call;
+    if(pt.kind === "proc"){
+      const pos = ps.map((c,i)=>[c,i]).filter(([c])=>c.param[0]==="#"), named = ps.map((c,i)=>[c,i]).filter(([c])=>c.param[0]!=="#");
+      const args = [...pos.map(([c,i])=>"@v"+(i+1)), ...named.map(([c,i])=>`${c.param} = @v${i+1}`)];
+      call = `EXEC ${pt.proc.split(".").map(qn).join(".")}${args.length?" "+args.join(", "):""};`;
+    } else {
+      const args = ps.map((c,i)=>[c,i]).filter(([c])=>c.param[0]!=="#").map(([c,i])=>`${c.param} = @v${i+1}`);
+      call = `EXEC sp_executesql @stmt${decl?", @params":""}${args.length?", "+args.join(", "):""};`;
+    }
+    L.push("", `-- Replay: runs the query once per ${ex?"row":"combination"} (same text and parameter declaration as the application),`,
+      "-- so each call shows up in Query Store / Extended Events. Set @run = 1 to execute it.",
+      "DECLARE @run bit = 0;", "IF @run = 1", "BEGIN");
+    if(varied) L.splice(L.length-3, 0, "-- The application sent this query with different parameter declarations; the replay uses the widest types.");
+    if(pt.kind !== "proc") L.push(`    DECLARE @stmt nvarchar(max) = ${sqlStr(pt.sql)};`, ...(decl?[`    DECLARE @params nvarchar(max) = ${sqlStr(decl)};`]:[]));
+    L.push(`    DECLARE @n int${ps.map((c,i)=>`, @v${i+1} ${c.type}`).join("")};`,
+      `    DECLARE replay CURSOR LOCAL FAST_FORWARD FOR SELECT ${[cols[0], ...ps].map(c=>qn(c.name)).join(", ")} FROM ${T} ORDER BY ${qn(cols[0].name)};`,
+      "    OPEN replay;", `    FETCH NEXT FROM replay INTO ${vars.join(", ")};`, "    WHILE @@FETCH_STATUS = 0", "    BEGIN",
+      "        " + call, `        FETCH NEXT FROM replay INTO ${vars.join(", ")};`, "    END;", "    CLOSE replay; DEALLOCATE replay;", "END;", "GO");
+  }
+  return L.join("\n") + "\n";
+}
+function pxCsv(pt, cols){
+  const q = v=> /[";\r\n]/.test(v) || /^\s|\s$/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+  const lines = [cols.map(c=>q(c.name)).join(";")];
+  pt.rows.forEach((r,i)=> lines.push(cols.map(c=>{ const x = c.get(r,i); return x.k==="null" ? "" : q(x.v) }).join(";")));
+  return String.fromCharCode(0xFEFF) + lines.join("\r\n") + "\r\n";
+}
+async function pxTable(){
+  const key = PX.fam+"|"+$("#pxMode").value;
+  if(!PX.cache[key]) PX.cache[key] = await api(`/api/params?id=${PX.fam}&mode=${$("#pxMode").value}`);
+  return PX.cache[key];
+}
+function pxRender(){
+  const v = segVal("#segPx");
+  $("#pxReplay").closest("label").classList.toggle("hidden", v!=="script");
+  $("#pxDrop").closest("label").classList.toggle("hidden", v==="csv");
+  $("#pxScript").classList.toggle("hidden", v==="csv");
+  $("#pxCsv").classList.toggle("hidden", v!=="csv");
+  $("#pxDb").classList.toggle("hidden", v!=="db");
+  $("#pxTable").closest("label").classList.toggle("hidden", v==="csv");
+  $("#btnPxGo").textContent = t(v==="script"?"px.goScript":v==="csv"?"px.goCsv":"px.goDb");
+  const own = !!(connOK && lastConn);
+  $("#pxConnForm").classList.toggle("hidden", own);
+  $("#pxConnTxt").textContent = own ? t("px.connected", (lastSI&&lastSI.server) || lastConn.server || "") : t("px.connect");
+  if(own && PX.conn !== lastConn){ PX.conn = lastConn; pxDbs(lastSI ? lastSI.databases : [], $("#sDb").value || (lastSI && lastSI.current)) }
+}
+function pxDbs(list, cur){
+  const sel = $("#pxDbSel"); sel.disabled = !list.length;
+  sel.innerHTML = list.map(d=>`<option ${d===cur?"selected":""}>${esc(d)}</option>`).join("");
+}
+async function openPx(){
+  PX.fam = curFam;
+  $("#pxMsg").className = "hint"; $("#pxMsg").textContent = "";
+  $("#pxDbTab").classList.toggle("hidden", !TOKEN);
+  const s = curDetail.summary, np = (curDetail.params||[]).filter(p=>!p.pseudo).length;
+  $("#pxInfo").textContent = t("px.info", fN(s.agg.count), np) + (np ? "" : " " + t("px.noParams"));
+  $("#pxOv").classList.remove("hidden");
+  pxRender();
+}
+seg("#segPx", pxRender);
+$("#tFamily").addEventListener("click", e=>{ if(e.target.closest("#btnPx")) openPx() });
+$("#btnClosePx").onclick = ()=> $("#pxOv").classList.add("hidden");
+$("#pxAuth").addEventListener("change", e=> $("#pxSqlAuth").classList.toggle("hidden", e.target.value!=="sql"));
+$("#btnPxConnect").onclick = async ()=>{
+  const msg = $("#pxConnMsg"); msg.className = "hint"; msg.textContent = t("conn.connecting");
+  const c = {mode:"fields", server:$("#pxServer").value, auth:$("#pxAuth").value, user:$("#pxUser").value, password:$("#pxPass").value, encrypt:"false", trust:true};
+  try{
+    const si = await api("/api/test", c, true);
+    PX.conn = c; pxDbs(si.databases, si.current);
+    msg.className = "ok"; msg.textContent = "✓ "+(si.server||"")+" · "+si.login;
+  }catch(e){ PX.conn = null; pxDbs([]); msg.className = "err"; msg.textContent = e.message }
+};
+$("#btnPxGo").onclick = async ()=>{
+  const v = segVal("#segPx"), msg = $("#pxMsg"), btn = $("#btnPxGo");
+  msg.className = "hint"; msg.textContent = t("px.reading"); btn.disabled = true;
+  try{
+    const pt = await pxTable(), cols = pxColumns(pt);
+    const notes = (pt.lists ? " " + t("px.lists", pt.lists) : "") + (pt.failed ? " " + t("px.failed", fN(pt.failed)) : "");
+    const base = `paramlens-params-${pt.family+1}-${pt.mode}`;
+    if(v === "script"){ download(base+".sql", String.fromCharCode(0xFEFF)+pxScript(pt, cols), "application/sql"); msg.textContent = t("px.done", fN(pt.rows.length)) + notes }
+    else if(v === "csv"){ download(base+".csv", pxCsv(pt, cols), "text/csv"); msg.textContent = t("px.done", fN(pt.rows.length)) + notes }
+    else {
+      if(!PX.conn || !$("#pxDbSel").value) throw new Error(t("px.connect"));
+      const [sc, tb] = pxSplitTable($("#pxTable").value);
+      msg.textContent = t("px.inserting", fN(pt.rows.length));
+      const r = await api("/api/insert", {conn:PX.conn, db:$("#pxDbSel").value, schema:sc, table:tb, replace:$("#pxDrop").checked,
+        columns: cols.map(c=>({name:c.name, type:c.type})),
+        rows: pt.rows.map((row,i)=> cols.map(c=>{ const x = c.get(row,i); return x.k==="null" ? null : x.k==="bin" ? {b:x.v.slice(2)} : x.v }))}, true);
+      msg.className = "ok"; msg.textContent = t("px.inserted", fN(r.rows), `${$("#pxDbSel").value}.${sc}.${tb}`) + notes;
+    }
+  }catch(e){ msg.className = "err"; msg.textContent = e.message }
+  btn.disabled = false;
+};
+
+/* ---------- compare two captures (baseline A × current analysis B) ---------- */
+// BASE: a capture kept for the comparison (snapshot); the other side is the analysis on screen
+let BASE = null, curDist = null, cmpSwap = false, cmpPending = false;
+const cmpSel = {base:null, cur:null};
+// a capture reduced to what the comparison needs: the queries and their metric percentiles
+function snapshot(dist){
+  const by = new Map(dist.map(d=>[d.id, d]));
+  return {paramlens:"baseline", v:1, label:(hdr&&hdr.label)||"", taken:nowStamp(), has:ov.has.slice(),
+    fams:(ov.families||[]).map(f=>({id:f.id, title:f.title, count:f.agg.count, sum:f.agg.sum, d:(by.get(f.id)||{}).d || []}))};
+}
+async function curSnapshot(){ if(!curDist) curDist = await api("/api/dist"); return snapshot(curDist) }
+function cmpDelta(a, b, factor, neutral){
+  if(a === b) return `<span class="hint">${esc(t("cmp.same"))}</span>`;
+  if(a === 0) return `<span class="${neutral?"":"bad"}">+∞</span>`;
+  const p = (b - a) / a, cls = Math.abs(p) < 0.005 || neutral ? "hint" : p < 0 ? "good" : "bad";
+  const x = !factor ? "" : b > 0 && a / b >= 1.5 ? " · " + t("cmp.lower", nf1.format(a/b)) : b / a >= 1.5 ? " · " + t("cmp.higher", nf1.format(b/a)) : "";
+  return `<span class="${cls}">${p > 0 ? "+" : "−"}${fP1(Math.abs(p))}${esc(x)}</span>`;
+}
+async function renderCompare(){
+  const el = $("#tCompare");
+  if(STATIC){ el.innerHTML = ""; return }
+  let cur;
+  try{ cur = await curSnapshot() }catch(e){ el.innerHTML = `<div class="err">${esc(e.message)}</div>`; return }
+  const btn = (a, k, pri) => `<button class="btn sm nf${pri?" primary":""}" data-cmp="${a}">${esc(t(k))}</button>`;
+  const actions = `<div class="row" style="margin-top:12px;flex-wrap:wrap">${btn("other","cmp.other",!BASE)}${btn("same","cmp.inThis")}${BASE?btn("swap","cmp.swap")+btn("save","cmp.save"):""}${btn("load","cmp.load")}${BASE?btn("clear","cmp.clear"):""}<div></div></div>`;
+  if(!BASE){ el.innerHTML = `<div class="card"><h2>${esc(t("cmp.title"))}</h2><p class="hint">${esc(t("cmp.noBase"))}</p>${actions}</div>`; return }
+  const byCount = fs => fs.slice().sort((x,y)=> y.count-x.count || x.id-y.id);
+  if(cmpSel.cur == null || !cur.fams.some(f=>f.id===cmpSel.cur)) cmpSel.cur = curFam != null ? curFam : (byCount(cur.fams)[0]||{}).id;
+  if(cmpSel.base == null || !BASE.fams.some(f=>f.id===cmpSel.base)){
+    const tc = (cur.fams.find(f=>f.id===cmpSel.cur)||{}).title, same = BASE.fams.find(f=>f.title===tc);
+    cmpSel.base = (same || byCount(BASE.fams)[0] || {}).id;
+  }
+  // A/B: the kept capture is A, unless swapped (rewrite captured first)
+  const sides = [{k:"base", cap:BASE}, {k:"cur", cap:cur}];
+  if(cmpSwap) sides.reverse();
+  const opt = (f, sel) => `<option value="${f.id}" ${f.id===sel?"selected":""}>${esc(t("cmp.opt", fN(f.count), f.title.slice(0,150)))}</option>`;
+  const pick = (s, key) => `<label class="f"><span>${esc(t(key, tv(s.cap.label)))}</span><select data-side="${s.k}">${byCount(s.cap.fams).map(f=>opt(f, cmpSel[s.k])).join("")}</select></label>`;
+  el.innerHTML = `<div class="card" style="margin-bottom:14px"><h2>${esc(t("cmp.title"))}</h2>
+    <p class="legend">${esc(t("cmp.legend"))}</p>
+    <div class="cmpSel">${pick(sides[0], "cmp.a")}${pick(sides[1], "cmp.b")}</div>
+    <p class="hint" style="margin:0">${esc(t("cmp.base", tv(BASE.label), fN(BASE.fams.length), BASE.taken))}</p>
+    ${actions}</div><div id="cmpOut"></div>`;
+  const fam = s => s.cap.fams.find(f=>f.id===cmpSel[s.k]);
+  renderCmpOut(fam(sides[0]), fam(sides[1]), sides[0].cap.has, sides[1].cap.has);
+}
+function renderCmpOut(A, B, hasA, hasB){
+  const el = $("#cmpOut");
+  if(!A || !B){ el.innerHTML = ""; return }
+  const MN = MNAME(), mean = (F,m)=> F.count ? F.sum[m]/F.count : 0;
+  const ms = [M.dur, M.cpu, M.reads, M.phys, M.writes, M.rows].filter(m=> hasA[m] && hasB[m] && A.d[m] && B.d[m]);
+  if(!ms.length){ el.innerHTML = `<div class="card empty">${esc(t("cmp.noMetric"))}</div>`; return }
+  let h = `<div class="kpis"><div class="kpi"><div class="l">${esc(t("cmp.execs"))}</div><div class="v">${fN(A.count)} → ${fN(B.count)}</div><div class="d"></div></div>`;
+  for(const m of ms.filter(m=>m===M.dur||m===M.cpu||m===M.reads)){
+    const a = mean(A,m), b = mean(B,m);
+    h += `<div class="kpi"><div class="l">${esc(MN[m])} · ${esc(t("cmp.avg"))}</div><div class="v">${cmpDelta(a,b,true)}</div><div class="d">${esc(fM(m,a))} → ${esc(fM(m,b))}</div></div>`;
+  }
+  h += `</div>`;
+  if(A.count < 30 || B.count < 30) h += `<div class="find s1"><div class="tt">${esc(t("cmp.few", fN(A.count), fN(B.count)))}</div></div>`;
+  if(ms.includes(M.rows)){
+    const ra = mean(A,M.rows), rb = mean(B,M.rows);
+    if(Math.abs(ra-rb) > Math.max(0.5, 0.01*Math.max(ra,rb))) h += `<div class="find s2"><div class="tt">${esc(t("cmp.rows", nf1.format(ra), nf1.format(rb)))}</div></div>`;
+  }
+  const stats = [["cmp.avg", (F,m)=>mean(F,m)], ["cmp.min", (F,m)=>F.d[m].min], ["p50", (F,m)=>F.d[m].p50], ["p90", (F,m)=>F.d[m].p90],
+    ["p95", (F,m)=>F.d[m].p95], ["p99", (F,m)=>F.d[m].p99], ["cmp.max", (F,m)=>F.d[m].max], ["cmp.total", (F,m)=>F.sum[m]]];
+  h += `<div class="cmpGrid">` + ms.map(m=>`<div class="card"><h2>${esc(MN[m])}</h2><table>
+    <tr><th>${esc(t("cmp.stat"))}</th><th class="n">A</th><th class="n">B</th><th class="n">${esc(t("cmp.change"))}</th></tr>
+    ${stats.map(([k,f])=>{ const a = f(A,m), b = f(B,m); return `<tr><td>${esc(/^p\d/.test(k)?k:t(k))}</td><td class="n">${esc(fM(m,a))}</td><td class="n">${esc(fM(m,b))}</td><td class="n">${cmpDelta(a,b,false,m===M.rows)}</td></tr>` }).join("")}
+  </table></div>`).join("") + `</div>`;
+  el.innerHTML = h;
+}
+$("#tCompare").addEventListener("change", e=>{
+  const s = e.target.dataset.side;
+  if(s){ cmpSel[s] = +e.target.value; renderCompare() }
+});
+$("#tCompare").addEventListener("click", async e=>{
+  const b = e.target.closest("[data-cmp]"); if(!b) return;
+  switch(b.dataset.cmp){
+    case "same": case "other":
+      try{ BASE = await curSnapshot(); cmpSel.base = curFam; cmpSwap = false }catch(err){ alert(err.message); return }
+      if(b.dataset.cmp === "other"){ cmpPending = {local:LOCAL}; showSetup(); return }
+      break;
+    case "swap": cmpSwap = !cmpSwap; break;
+    case "save": download(`paramlens-baseline-${BASE.taken.replace(/[-: ]/g,"").replace(/^(\d{8})/,"$1-")}.json`, JSON.stringify(BASE), "application/json"); return;
+    case "load": $("#cmpFile").click(); return;
+    case "clear": BASE = null; cmpSwap = false; break;
+  }
+  renderCompare();
+});
+$("#cmpFile").addEventListener("change", async e=>{
+  const f = e.target.files[0]; e.target.value = "";
+  if(!f) return;
+  try{
+    const j = JSON.parse(await f.text());
+    if(!j || j.paramlens !== "baseline" || !Array.isArray(j.fams) || !Array.isArray(j.has)) throw new Error("bad");
+    BASE = j; cmpSel.base = null; cmpSwap = false;
+  }catch(err){ alert(t("cmp.badFile")) }
+  renderCompare();
+});
 
 /* ---------- top bar ---------- */
 function showSetup(){
   $("#vRes").classList.add("hidden");
+  $("#cmpBanner").classList.toggle("hidden", !cmpPending);
+  if(cmpPending) $("#cmpBannerT").textContent = t("cmp.pending", tv(BASE.label));
   $("#vSetup").classList.toggle("hidden", LOCAL);
   $("#vFile").classList.toggle("hidden", !LOCAL);
   $("#btnNew").classList.add("hidden"); $("#btnExport").classList.add("hidden");
   renderHdr();
 }
-$("#btnNew").onclick = showSetup;
+$("#btnNew").onclick = ()=>{ cmpPending = false; showSetup() };
+$("#btnCmpCancel").onclick = ()=>{ LOCAL = cmpPending ? cmpPending.local : LOCAL; cmpPending = false; $("#cmpBanner").classList.add("hidden"); loadResults().catch(e=> alert(e.message)) };
 $("#btnExport").onclick = ()=>{
   if(LOCAL){ try{ exportLocal() }catch(e){ alert(t("exportFail")+e.message) } return }
   location.href = "/api/export?t="+encodeURIComponent(TOKEN);
@@ -1070,6 +1463,8 @@ async function localApi(path, body){
         elapsedMs:(LJ.t1||Date.now())-LJ.t0, label:LJ.label, progress: i&&i.size? Math.min(1,i.bytesRead/i.size) : 0};
     }
     case "/api/cancel": LJ.cancel = true; return {ok:"1"};
+    case "/api/params": return need().paramTable(+q.get("id"), q.get("mode"), refs=> ENGINE.readStatementsAt(LJ.file, LJ.info.encInfo, refs));
+    case "/api/dist": return need().distributions();
     case "/api/overview": { const o = need().overview(); o.fileInfo = fileInfoOut(); return {overview:o, label:LJ.label, state:LJ.state} }
     case "/api/family": { const d = need().detail(+q.get("id")); if(!d) throw new Error(tm("query not found")); return d }
     case "/api/combos": { const c = need().combos(body.id, body.indexes); if(!c) throw new Error(tm("query not found")); return c }
@@ -1207,6 +1602,10 @@ $("#vFile").addEventListener("click", e=>{
 
 /* ---------- start ---------- */
 applyLang();
+if(APP) $("#btnQuit").classList.add("hidden");
+// the .exe remembers the language in the user profile (the port, and so localStorage, changes every run)
+if(TOKEN && !new URLSearchParams(location.search).get("lang"))
+  api("/api/prefs", undefined, true).then(p=>{ if(p.lang && I18N[p.lang] && p.lang !== LANG){ LANG = p.lang; setLocale(); applyLang() } }).catch(()=>{});
 if(STATIC){
   $("#btnQuit").classList.add("hidden");
   loadResults();

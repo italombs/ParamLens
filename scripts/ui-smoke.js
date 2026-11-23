@@ -56,6 +56,95 @@ async function checkResults(page, label, { samples }) {
   }
 }
 
+async function download(page, sel) {
+  const [d] = await Promise.all([page.waitForEvent("download"), page.click(sel)]);
+  return { name: d.suggestedFilename(), text: fs.readFileSync(await d.path(), "utf8").replace(/^﻿/, "") };
+}
+
+// parameter export (script / CSV, per execution and per combination) of the query on screen
+async function checkParamExport(page, label, { db }) {
+  await page.click("#btnPx");
+  check(await page.isVisible("#pxOv"), `${label}: export dialog opens`);
+  check((await page.isVisible("#pxDbTab")) === db, `${label}: "insert into a database" ${db ? "offered" : "hidden without the .exe"}`);
+  const execs = +(await page.textContent("#pxInfo")).match(/^([\d,]+) executions/)[1].replace(/,/g, "");
+  const s = await download(page, "#btnPxGo");
+  const tuples = s.text.split("\n").filter(l => /^\(\d+, /.test(l)).length;
+  check(/^paramlens-params-\d+-execs\.sql$/.test(s.name) && /CREATE TABLE \[dbo\]\.\[paramlens_params\] \(\n  \[exec_no\] int NOT NULL,/.test(s.text)
+    && /SET DATEFORMAT ymd;/.test(s.text) && tuples === execs, `${label}: script with one row per execution (${tuples}/${execs})`);
+  check(/DECLARE @run bit = 0;/.test(s.text) && /EXEC sp_executesql @stmt, @params, @\w+ = @v1/.test(s.text), `${label}: replay loop`);
+  check(/^-- ParamLens: parameters/.test(await page.textContent("#pxMsg")) === false && /rows exported/.test(await page.textContent("#pxMsg")), `${label}: export message`);
+  await page.click("#segPx button[data-v=csv]");
+  const c = await download(page, "#btnPxGo");
+  const lines = c.text.trim().split("\r\n");
+  check(/^exec_no;/.test(lines[0]) && lines.length === execs + 1, `${label}: CSV with a header and one line per execution`);
+  await page.selectOption("#pxMode", "combos");
+  await page.click("#segPx button[data-v=script]");
+  const k = await download(page, "#btnPxGo");
+  check(/\[combo_no\] int NOT NULL,\n  \[executions\] int NULL,/.test(k.text) && /avg_/.test(k.text), `${label}: script per combination`);
+  await page.selectOption("#pxMode", "execs");
+  await page.click("#btnClosePx");
+}
+
+// baseline × current analysis, saved and loaded back
+async function checkCompare(page, label) {
+  await page.click("#mainTabs button[data-v=compare]");
+  await page.waitForSelector("#tCompare [data-cmp=same]");
+  await page.click("#tCompare [data-cmp=same]");
+  await page.waitForSelector("#tCompare select[data-side=cur]");
+  check(/same/.test(await page.textContent("#cmpOut")), `${label}: a query compared with itself is "same"`);
+  const opts = await page.$$eval("select[data-side=cur] option", os => os.map(o => o.value));
+  await page.selectOption("select[data-side=cur]", opts[opts.length - 1]);
+  await page.waitForFunction(() => /[−+]\d/.test(document.querySelector("#cmpOut").textContent));
+  const out = await page.textContent("#cmpOut");
+  check(/p95/.test(out) && /Average/.test(out) && /Executions/.test(out), `${label}: comparison of two queries of the same capture`);
+  const before = await page.textContent("#cmpOut .kpis");
+  await page.click("#tCompare [data-cmp=swap]");
+  await page.waitForFunction(b => document.querySelector("#cmpOut .kpis").textContent !== b, before);
+  check(/A \(original\)/.test(await page.textContent("#tCompare")), `${label}: A and B swapped`);
+  await page.click("#tCompare [data-cmp=swap]");
+  const b = await download(page, "#tCompare [data-cmp=save]");
+  const j = JSON.parse(b.text);
+  check(j.paramlens === "baseline" && j.fams.length === opts.length && j.fams[0].d.some(Boolean), `${label}: kept capture saved (${j.fams.length} queries)`);
+  await page.click("#tCompare [data-cmp=clear]");
+  const f = path.join(shots, "baseline.json");
+  fs.writeFileSync(f, b.text);
+  await page.setInputFiles("#cmpFile", f);
+  await page.waitForSelector("#tCompare select[data-side=base]");
+  check(true, `${label}: saved capture loaded from the file`);
+  await page.selectOption("#langSel", "pt-BR");
+  check(/Comparar desempenho/.test(await page.textContent("#tCompare")) && /Média/.test(await page.textContent("#cmpOut")), `${label}: comparison in pt-BR`);
+  await page.selectOption("#langSel", "en");
+  await page.click("#mainTabs button[data-v=findings]");
+}
+
+// "compare with another capture": the analysis on screen is kept as A, B comes from the source screen
+async function checkCompareOther(page, label, analyze) {
+  await page.click("#mainTabs button[data-v=compare]");
+  await page.waitForSelector("#tCompare [data-cmp=other]");
+  await page.click("#tCompare [data-cmp=other]");
+  await page.waitForSelector("#vRes.hidden", { state: "attached" });
+  check(await page.isVisible("#cmpBanner") && /is kept as A/.test(await page.textContent("#cmpBanner")), `${label}: source screen with the comparison banner`);
+  await page.click("#btnCmpCancel");
+  await page.waitForSelector("#vRes:not(.hidden)");
+  check(!(await page.isVisible("#cmpBanner")), `${label}: cancel goes back to the results`);
+  await page.click("#mainTabs button[data-v=compare]");
+  await page.click("#tCompare [data-cmp=other]");
+  await analyze();
+  await page.waitForSelector("#tCompare:not(.hidden) select[data-side=cur]", { timeout: 60000 });
+  check(/Kept capture/.test(await page.textContent("#tCompare")) && /[−+]\d|same/.test(await page.textContent("#cmpOut")), `${label}: comparison opens after analyzing the other capture`);
+  await page.click("#mainTabs button[data-v=findings]");
+}
+
+async function noHorizontalScroll(page, label) {
+  for (let i = 0; i < 3; i++) {
+    await (await page.$$("#famList .fam"))[i].click();
+    await page.waitForSelector("#tFamily:not(.hidden) #ptab");
+    const w = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    if (w[0] > w[1]) { check(false, `${label}: page wider than the window (${w[0]} > ${w[1]})`); return; }
+  }
+  check(true, `${label}: no horizontal page scroll`);
+}
+
 (async () => {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ acceptDownloads: true, viewport: { width: 1400, height: 900 } });
@@ -83,6 +172,10 @@ async function checkResults(page, label, { samples }) {
 
   await analyzeFile(page, tsvPath);
   await checkResults(page, "html", { samples: true });
+  await noHorizontalScroll(page, "html");
+  await checkParamExport(page, "html", { db: false });
+  await checkCompare(page, "html");
+  await checkCompareOther(page, "html", () => analyzeFile(page, tsvPath));
   await page.click("#mainTabs button[data-v=fails]");
   const fails = await page.textContent("#tFails");
   check(/Ignored: event sp_statement_completed\s*63/.test(fails), "html: ignored events counted");
@@ -177,6 +270,17 @@ async function checkResults(page, label, { samples }) {
     await p3.waitForFunction(() => /DECLARE/.test(document.querySelector("#sampleTxt").textContent));
     check(true, "exe: sample through the API");
     await p3.click("#btnCloseSample");
+    await checkParamExport(p3, "exe", { db: true });
+    await checkCompare(p3, "exe");
+    await checkCompareOther(p3, "exe", () => p3.click("#btnDemo"));
+    await p3.selectOption("#langSel", "pt-BR");
+    const p4 = await ctx.newPage();
+    await p4.goto(url.replace("127.0.0.1", "localhost") + "&app=1"); // another origin: no shared localStorage
+    check(!(await p4.isVisible("#btnQuit")), "exe: no Quit button inside the app window");
+    await p4.waitForFunction(() => document.documentElement.lang === "pt-BR", null, { timeout: 5000 }).catch(() => {});
+    check((await p4.getAttribute("html", "lang")) === "pt-BR", "exe: language remembered by the .exe");
+    await p4.close();
+    await p3.selectOption("#langSel", "en");
     await p3.selectOption("#langSel", "pt-BR");
     check(/dados de exemplo/.test(await p3.textContent("#hdrSub")) && /verdadeiro em/.test(await p3.textContent("#tFamily")), "exe: pt-BR on server data");
     await p3.selectOption("#langSel", "en");
