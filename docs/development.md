@@ -94,7 +94,8 @@ node scripts/docs-media.js dist/paramlens dist/ParamLens.html dist/parity/export
 ffmpeg -y -i dist/media/tour.webm -vf "fps=8,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" docs/images/tour.gif
 ```
 
-Never use a real capture for documentation images.
+The comparison images use `dist/media/rewrite.tsv`, a synthetic capture of a rewrite of the sample order
+count query written by the same script. Never use a real capture for documentation images.
 
 ## Docker
 

@@ -57,9 +57,22 @@ More in the [user guide](docs/user-guide.md).
   combination) as a SQL script with an optional replay loop for Query Store, as CSV, or inserted straight
   into a table of your choice.
 - **Before × after comparison:** pick the original query and the rewrite, in the same capture or in two
-  captures (another table, `.xel` or file),
-  and get the change in average, p50, p95, p99 and max of duration, CPU and reads.
+  captures (another table, `.xel` or file), and get the change in average, p50, p95, p99 and max of
+  duration, CPU and reads.
 - **HTML report** you can export and open offline.
+
+## From diagnosis to a measured fix
+
+1. **Find** the catch-all ORs, sniffing-prone values and expensive call shapes of a query.
+2. **Export its parameters** exactly as the application sent them and replay them against the original
+   and the rewritten query (SQLQueryStress, Query Store, a test database).
+3. **Capture both runs** with Extended Events and **compare** them: the change per metric and
+   percentile, with a warning when the rewrite returns a different number of rows.
+
+![Comparison of a query and its rewrite: 22.9× fewer logical reads on average, p95 from 149,077 to 3,548](docs/images/compare.png)
+
+*Sample data against a synthetic capture of a rewrite: try it with **Load sample data**, or see the
+[feature tour](docs/tour.md).*
 
 ## Privacy
 

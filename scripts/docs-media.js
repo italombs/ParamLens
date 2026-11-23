@@ -29,6 +29,47 @@ async function startServer() {
 // cards of the "Selected query" tab, located by their title
 const card = (page, title) => page.locator("#tFamily .card", { has: page.locator("h2", { hasText: title }) });
 
+// A synthetic capture of a rewrite of the sample's order count query (NOT EXISTS/EXISTS instead of the
+// LEFT JOINs, OPTION (RECOMPILE)), in the "ParamLens TSV v1" format, to show the comparison with
+// another capture. Deterministic.
+function writeRewriteCapture(file) {
+  let seed = 7;
+  const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  const sql = `SELECT count(1) FROM {SALESORDER} [ENSALESORDER]
+WHERE [ENSALESORDER].[STOREID] = @qploStoreId
+ AND [ENSALESORDER].[ORDERTYPEID] IN (1,2,3)
+ AND [ENSALESORDER].[ORDERSTATEID] <> @qpinOrderStateIdArchived
+ AND (@qploDropdownCarrierId = 0 OR EXISTS (SELECT 1 FROM {SHIPMENT} [ENSHIPMENT] WHERE [ENSHIPMENT].[ORDERID] = [ENSALESORDER].[ID] AND [ENSHIPMENT].[CARRIERID] = @qploDropdownCarrierId))
+ AND (@qpboUnreadOnly = 0 OR NOT EXISTS (SELECT 1 FROM {ORDERVIEW} [ENORDERVIEW] WHERE [ENORDERVIEW].[ORDERID] = [ENSALESORDER].[ID] AND [ENORDERVIEW].[STOREUSERID] = @qploStoreUserId))
+ AND (@qpdaStartDate = @qpdaNullDate OR [ENSALESORDER].[CREATEDON] >= @qpdaStartDate)
+OPTION (RECOMPILE)`.replace(/'/g, "''");
+  const decl = "@qploStoreUserId bigint,@qploStoreId bigint,@qploDropdownCarrierId bigint,@qpboUnreadOnly bit,@qpdaStartDate datetime,@qpdaNullDate datetime,@qpinOrderStateIdArchived int";
+  const esc = s => s.replace(/\\/g, "\\\\").replace(/\r/g, "\\r").replace(/\n/g, "\\n").replace(/\t/g, "\\t");
+  const lines = ["event\ttimestamp\tduration\tcpu_time\tlogical_reads\tphysical_reads\twrites\trow_count\tstatement"];
+  for (let i = 0; i < 2000; i++) {
+    const carrier = rnd(100) < 9 ? 5000 + rnd(300) : 0;
+    const start = rnd(100) < 15 ? `2026-${String(1 + rnd(10)).padStart(2, "0")}-${String(1 + rnd(28)).padStart(2, "0")} 00:00:00` : "1900-01-01 00:00:00";
+    let reads = carrier ? 2500 + rnd(1500) : 180 + rnd(160);
+    if (start[0] === "2") reads += 600 + rnd(300);
+    const stmt = `exec sp_executesql N'${sql}',N'${decl}',@qploStoreUserId=${1000 + rnd(800)},@qploStoreId=${[12, 12, 12, 15, 31][rnd(5)]},@qploDropdownCarrierId=${carrier},@qpboUnreadOnly=${rnd(100) < 40 ? 1 : 0},@qpdaStartDate='${start}',@qpdaNullDate='1900-01-01 00:00:00',@qpinOrderStateIdArchived=6`;
+    const ts = new Date(Date.UTC(2026, 10, 21, 14, 0, 0) + i * 900).toISOString().slice(0, 23);
+    lines.push(["rpc_completed", ts, reads * 9, reads * 6, reads, rnd(5), 0, 1, esc(stmt)].join("\t"));
+  }
+  fs.writeFileSync(file, lines.join("\n") + "\n");
+}
+
+// Compare tab: the selected query of the sample data (A) against the rewrite capture (B), through
+// "Compare with another capture…" and the file source
+async function compareWithRewrite(page, file, wait = 0) {
+  await page.click("#mainTabs button[data-v=compare]"); await pause(wait);
+  await page.click("#tCompare [data-cmp=other]"); await pause(wait);
+  await page.click("#btnToFile");
+  await page.setInputFiles("#fFile", file); await pause(wait);
+  await page.click("#btnFileAnalyze");
+  await page.waitForSelector("#tCompare:not(.hidden) select[data-side=cur]", { timeout: 60000 });
+  await page.waitForFunction(() => /[−+]\d/.test(document.querySelector("#cmpOut").textContent));
+}
+
 (async () => {
   const browser = await chromium.launch();
   let { srv, url } = await startServer();
@@ -52,10 +93,20 @@ const card = (page, title) => page.locator("#tFamily .card", { has: page.locator
   await p.waitForFunction(() => /DECLARE/.test(document.querySelector("#sampleTxt").textContent));
   await shot(p.locator("#sampleOv .modal"), "sample-script.png");
   await p.click("#btnCloseSample");
+  await p.click("#btnPx");
+  await p.waitForFunction(() => /\d/.test(document.querySelector("#pxInfo").textContent));
+  await shot(p.locator("#pxOv .modal"), "export-params.png");
+  await p.click("#btnClosePx");
   await p.selectOption("#langSel", "pt-BR");
   await p.click("#mainTabs button[data-v=findings]");
   await shot(p, "findings-pt-br.png");
   await p.selectOption("#langSel", "en");
+  const rewrite = path.join(videoDir, "rewrite.tsv");
+  writeRewriteCapture(rewrite);
+  await compareWithRewrite(p, rewrite);
+  await p.setViewportSize({ width: 1360, height: 1200 });
+  await p.evaluate(() => scrollTo(0, 0));
+  await shot(p.locator("#tCompare"), "compare.png");
 
   // ---------- standalone HTML ----------
   const h = await ctx.newPage();
@@ -96,6 +147,14 @@ const card = (page, title) => page.locator("#tFamily .card", { has: page.locator
   await v.waitForFunction(() => /DECLARE/.test(document.querySelector("#sampleTxt").textContent));
   await pause(2500);
   await v.click("#btnCloseSample"); await pause(500);
+  await v.click("#btnPx"); await pause(2500);
+  await v.click("#segPx button[data-v=csv]"); await pause(1200);
+  await v.click("#segPx button[data-v=script]"); await pause(800);
+  await v.click("#btnClosePx"); await pause(400);
+  await v.evaluate(() => scrollTo(0, 0));
+  await compareWithRewrite(v, rewrite, 900);
+  await pause(2500);
+  await v.mouse.wheel(0, 450); await pause(2500);
   const video = v.video();
   await vctx.close();
   fs.renameSync(await video.path(), path.join(videoDir, "tour.webm"));

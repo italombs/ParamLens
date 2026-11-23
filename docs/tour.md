@@ -3,11 +3,11 @@
 All screenshots use the built-in **sample data** (synthetic, OutSystems-style queries over a fictitious
 orders/customers/invoices schema). Try it yourself: run `ParamLens.exe` and click **Load sample data**.
 
-![Usage: load the sample data, open a query, inspect parameters and a sample execution](images/tour.gif)
+![Usage: load the sample data, open a query, inspect its parameters, export them and compare the query with its rewrite](images/tour.gif)
 
 ## 1. Connect
 
-`ParamLens.exe` opens a local page in your browser. Connect with Windows or SQL Server authentication and
+`ParamLens.exe` opens in its own window (closing it quits). Connect with Windows or SQL Server authentication and
 pick the source: a table with the captured events or a `.xel` file on the server.
 
 ![Connection and event source](images/connect.png)
@@ -57,14 +57,34 @@ the `DECLARE`s and the SQL, ready to paste into SSMS and look at the plan.
 
 ![Sample execution as a test script](images/sample-script.png)
 
-## 8. English or Portuguese
+## 8. Export the parameters
+
+**Export parameters** takes the exact values of every call of the query (read again from the capture,
+without the 200-byte cut of the tables), one row per execution or per distinct combination: as a SQL
+script (`CREATE TABLE` + `INSERT`, with an optional replay loop through `sp_executesql` for Query Store
+tests), as CSV, or inserted straight into a table of a database you choose.
+
+![Parameter export](images/export-params.png)
+
+## 9. Compare the original with the rewrite
+
+Replay the parameters against the original query and against your rewrite, capture both runs and open
+the **Compare** tab: pick two queries of the same capture, or keep the current analysis and analyze
+another table, `.xel` or file. You get the change in average, min, p50 to p99, max and total of every
+metric, with a warning when the number of rows returned differs or there are few executions. Here the
+sample data is compared with a synthetic capture of a rewrite of its order count query (`EXISTS` /
+`NOT EXISTS` instead of the `LEFT JOIN`s, `OPTION (RECOMPILE)`).
+
+![Before × after comparison](images/compare.png)
+
+## 10. English or Portuguese
 
 The interface is in English by default and can be switched to Portuguese (pt-BR) in the header; numbers
 follow the selected language. Exported reports can switch too.
 
 ![Findings in Portuguese](images/findings-pt-br.png)
 
-## 9. The standalone HTML version
+## 11. The standalone HTML version
 
 `ParamLens.html` does not connect to SQL Server: it builds the export command for you (bcp or an SSMS
 query, for a `.xel` file or a table), and you drop the exported file onto the page. Everything runs in the
