@@ -6,6 +6,28 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-23
+
+### Added
+- **Export parameters** of a query: the exact values of every call (without the 200-byte cut of the
+  tables), one row per execution or per distinct combination, with typed columns and the metrics. As a
+  SQL script (`CREATE TABLE` + `INSERT`, optional replay loop through `sp_executesql` for Query Store
+  tests), as CSV, or inserted straight into a table of a database you choose (`.exe`).
+- **Compare** tab: two queries of the same capture, or the current analysis against another capture
+  (another table, `.xel` or exported file, chosen on the usual source screen). Shows the change in
+  average, min, p50, p90, p95, p99, max and total of each metric, with warnings when the number of rows
+  returned differs or there are few executions; A and B can be swapped, and the kept capture can be
+  saved to and loaded from a `.json` file.
+- Application icon.
+
+### Changed
+- The `.exe` opens its own window (WebView2) instead of a console plus a browser tab: a single item in
+  the taskbar, and closing the window quits the program. Without WebView2, or with `-browser`, it uses
+  the browser and a console window as before.
+- Wide tables no longer make the whole page scroll horizontally, short values such as dates stay on one
+  line, and the page uses the whole width of large screens; the query list is narrower on small
+  screens and table headers and badges wrap.
+
 ## [1.3.1] - 2026-11-20
 
 ### Changed
@@ -51,7 +73,8 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 - First release: `ParamLens.exe`, parameter profiling of `rpc_completed` captures from a table or a
   `.xel` file, with catch-all detection, call shapes, combinations, findings and an exportable report.
 
-[Unreleased]: https://github.com/italombs/ParamLens/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/italombs/ParamLens/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/italombs/ParamLens/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/italombs/ParamLens/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/italombs/ParamLens/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/italombs/ParamLens/compare/v1.1.0...v1.2.0
