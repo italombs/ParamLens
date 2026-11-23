@@ -181,6 +181,7 @@ func TestParityFixtures(t *testing.T) {
 		ov := eng.Overview()
 		details := map[int]*engine.FamilyDetail{}
 		samples := map[int]map[string]string{}
+		paramTables := map[int]map[string]*engine.ParamTable{}
 		for _, f := range ov.Families {
 			d, _ := eng.Detail(f.ID)
 			details[f.ID] = d
@@ -198,9 +199,18 @@ func TestParityFixtures(t *testing.T) {
 			d2 := *d
 			d2.Combos = c
 			details[f.ID] = &d2
+			paramTables[f.ID] = map[string]*engine.ParamTable{}
+			for _, mode := range []string{"execs", "combos"} {
+				pt, err := eng.ParamTable(f.ID, mode)
+				if err != nil {
+					t.Fatal(err)
+				}
+				paramTables[f.ID][mode] = pt
+			}
 		}
 		data, err := json.Marshal(map[string]any{
 			"overview": ov, "details": details, "samples": samples, "ignored": ignored,
+			"paramTables": paramTables, "distributions": eng.Distributions(),
 		})
 		eng.Close()
 		if err != nil {

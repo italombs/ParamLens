@@ -38,7 +38,18 @@ var errNotExec = errors.New("not an EXEC call")
 //	exec sp_executesql N'select ...',N'@a int,@b nvarchar(50)',@a=1,@b=N'x'
 //	declare @p1 int set @p1=NULL exec sp_prepexec @p1 output,N'@P0 int',N'select ...',@P0=1 select @p1
 //	exec dbo.MinhaProc @x=1,@y='a'
-func ParseRPC(stmt string) (*RPC, error) {
+func ParseRPC(stmt string) (*RPC, error) { return parseRPC(stmt, true) }
+
+// ParseRPCFull is ParseRPC without the 200-byte cut on values (used to export the exact values).
+func ParseRPCFull(stmt string) (*RPC, error) { return parseRPC(stmt, false) }
+
+func keepValue(v string) string { return v }
+
+func parseRPC(stmt string, clip bool) (*RPC, error) {
+	cv := ClipValue
+	if !clip {
+		cv = keepValue
+	}
 	toks := Tokenize(stmt)
 	i := -1
 	for k, t := range toks {
@@ -136,7 +147,7 @@ done:
 	case "sp_executesql":
 		r.Kind = "sp_executesql"
 		rest := assignSystemArgs(r, args, []string{"@stmt", "@params"})
-		r.Params = bindParams(r.Decl, rest)
+		r.Params = bindParams(r.Decl, rest, cv)
 	case "sp_prepexec":
 		r.Kind = "sp_prepexec"
 		// handle, params, stmt, valores...
@@ -144,7 +155,7 @@ done:
 			args = args[1:]
 		}
 		rest := assignSystemArgs(r, args, []string{"@params", "@stmt"})
-		r.Params = bindParams(r.Decl, rest)
+		r.Params = bindParams(r.Decl, rest, cv)
 	default:
 		r.Kind = "proc"
 		for k, a := range args {
@@ -152,7 +163,7 @@ done:
 			if name == "" {
 				name = "#" + itoa(k+1)
 			}
-			r.Params = append(r.Params, Param{Name: name, Value: ClipValue(a.value), IsNull: a.isNull})
+			r.Params = append(r.Params, Param{Name: name, Value: cv(a.value), IsNull: a.isNull})
 		}
 	}
 	return r, nil
@@ -227,7 +238,7 @@ func ParseDecl(decl string) []declParam {
 	return out
 }
 
-func bindParams(decl string, args []rpcArg) []Param {
+func bindParams(decl string, args []rpcArg, cv func(string) string) []Param {
 	dps := ParseDecl(decl)
 	byName := make(map[string]int, len(dps))
 	for k, d := range dps {
@@ -260,10 +271,10 @@ func bindParams(decl string, args []rpcArg) []Param {
 			if name == "" {
 				name = "#" + itoa(len(extra)+1)
 			}
-			extra = append(extra, Param{Name: name, Value: ClipValue(a.value), IsNull: a.isNull})
+			extra = append(extra, Param{Name: name, Value: cv(a.value), IsNull: a.isNull})
 			continue
 		}
-		params[idx].Value = ClipValue(a.value)
+		params[idx].Value = cv(a.value)
 		params[idx].IsNull = a.isNull
 		set[idx] = true
 	}

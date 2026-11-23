@@ -82,6 +82,9 @@ function diff(a, b, p, out) {
       const ov = engine.overview();
       const details = {};
       const samples = {};
+      const paramTables = {};
+      const blob = new Blob([bytes]);
+      const readBatch = refs => PL.readStatementsAt(blob, info.encInfo, refs);
       for (const f of ov.families) {
         const d = engine.detail(f.id);
         const all = d.params.map((_, i) => i);
@@ -89,9 +92,11 @@ function diff(a, b, p, out) {
         const ref = engine.execRef(f.agg.sample);
         const s = await PL.readStatementAt(new Blob([bytes]), info.encInfo, ref.off, ref.len);
         samples[f.agg.sample] = { statement: s, script: PL.testScript(s) };
+        paramTables[f.id] = { execs: await engine.paramTable(f.id, "execs", readBatch), combos: await engine.paramTable(f.id, "combos", readBatch) };
       }
-      const g = canon({ overview: Object.assign({}, golden.overview, { elapsedMs: 0 }), details: golden.details, samples: golden.samples });
-      const j = canon({ overview: Object.assign({}, ov, { elapsedMs: 0 }), details, samples });
+      const g = canon({ overview: Object.assign({}, golden.overview, { elapsedMs: 0 }), details: golden.details, samples: golden.samples,
+        paramTables: golden.paramTables, distributions: golden.distributions });
+      const j = canon({ overview: Object.assign({}, ov, { elapsedMs: 0 }), details, samples, paramTables, distributions: engine.distributions() });
       const out = [];
       diff(g, j, "", out);
       const ign = info.ignored.sp_statement_completed || 0;

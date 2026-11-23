@@ -277,6 +277,7 @@ function clipValue(v) {
   if (n <= MAX_VALUE_LEN) return v;
   return utf8Prefix(v, MAX_VALUE_LEN) + "…(" + n + " bytes)";
 }
+function keepValue(v) { return v; }
 
 /* ===================== parse do RPC (rpc.go) ===================== */
 
@@ -288,7 +289,9 @@ function unquoteIdent(s) {
   return s;
 }
 
-function parseRPC(stmt) {
+// full = true keeps the values whole (no 200-byte cut), like ParseRPCFull
+function parseRPC(stmt, full) {
+  const cv = full ? keepValue : clipValue;
   const toks = tokenize(stmt);
   let i = -1;
   for (let k = 0; k < toks.length; k++) {
@@ -342,16 +345,16 @@ function parseRPC(stmt) {
   if (last === "sp_executesql") {
     r.kind = "sp_executesql";
     const rest = assignSystemArgs(r, args, ["@stmt", "@params"]);
-    r.params = bindParams(r.decl, rest);
+    r.params = bindParams(r.decl, rest, cv);
   } else if (last === "sp_prepexec") {
     r.kind = "sp_prepexec";
     // handle, params, stmt, valores...
     const rest = assignSystemArgs(r, args.slice(1), ["@params", "@stmt"]);
-    r.params = bindParams(r.decl, rest);
+    r.params = bindParams(r.decl, rest, cv);
   } else {
     r.kind = "proc";
     args.forEach((a, k) => {
-      r.params.push({ name: a.name || "#" + (k + 1), type: "", value: clipValue(a.value), isNull: a.isNull });
+      r.params.push({ name: a.name || "#" + (k + 1), type: "", value: cv(a.value), isNull: a.isNull });
     });
   }
   return r;
@@ -400,7 +403,7 @@ function parseDecl(decl) {
   return out;
 }
 
-function bindParams(decl, args) {
+function bindParams(decl, args, cv) {
   const dps = parseDecl(decl);
   const byName = new Map();
   dps.forEach((d, k) => byName.set(lowerGo(d.name), k));
@@ -418,10 +421,10 @@ function bindParams(decl, args) {
       if (pos < params.length) { idx = pos; pos++; }
     }
     if (idx < 0) {
-      extra.push({ name: a.name || "#" + (extra.length + 1), type: "", value: clipValue(a.value), isNull: a.isNull });
+      extra.push({ name: a.name || "#" + (extra.length + 1), type: "", value: cv(a.value), isNull: a.isNull });
       continue;
     }
-    params[idx].value = clipValue(a.value);
+    params[idx].value = cv(a.value);
     params[idx].isNull = a.isNull;
     set[idx] = true;
   }
@@ -848,6 +851,78 @@ class Engine {
   execRef(ix) {
     const e = this.execs[ix];
     return e ? { off: e.off, len: e.len } : null;
+  }
+
+  /* ---------- parameter table and distributions (extract.go) ---------- */
+
+  // exact values of every parameter of a query, one row per execution ("execs") or per distinct
+  // combination ("combos"); readBatch(refs) re-reads the statements: Promise<string[]>
+  async paramTable(id, mode, readBatch) {
+    const f = this.fams[id];
+    if (!f) return null;
+    if (mode !== "combos") mode = "execs";
+    const pt = { family: f.id, kind: f.kind, proc: f.proc, sql: f.sampleSQL, decl: "", mode, has: this.has.slice(), lists: 0, params: [], rows: [], failed: 0 };
+    let best = null;
+    for (const [k, v] of f.decls) if (!best || v > best.v || (v === best.v && cmpStr(k, best.k) < 0)) best = { k, v };
+    if (best) pt.decl = best.k;
+    const colOf = new Array(f.params.length).fill(-1);
+    let ncols = 0;
+    f.params.forEach((p, i) => {
+      if (p.pseudo) { if (p.pseudo === PSEUDO_IN_VALS) pt.lists++; return; }
+      const types = [];
+      for (const [k, v] of p.types) types.push({ k, v });
+      types.sort((a, b) => (b.v - a.v) || cmpStr(a.k, b.k));
+      pt.params.push({ name: p.name, types });
+      colOf[i] = ncols++;
+    });
+    const byKey = new Map();
+    const B = 2000;
+    for (let s = 0; s < f.execs.length; s += B) {
+      const ixs = f.execs.slice(s, s + B);
+      const stmts = await readBatch(ixs.map(ix => this.execRef(ix)));
+      ixs.forEach((ix, k) => {
+        const ex = this.execs[ix];
+        const vals = new Array(ncols).fill(ABSENT);
+        const rpc = stmts[k] == null ? null : parseRPC(stmts[k], true);
+        if (!rpc || rpc.err) pt.failed++;
+        else {
+          for (const p of rpc.params) {
+            const pi = f.pidx.get(lowerGo(p.name));
+            if (pi !== undefined && colOf[pi] >= 0) vals[colOf[pi]] = p.value;
+          }
+        }
+        if (mode === "execs") { pt.rows.push({ values: vals, count: 1, sum: ex.m.slice(), exec: ix }); return; }
+        const key = vals.join("\x00");
+        const r = byKey.get(key);
+        if (r !== undefined) {
+          const row = pt.rows[r];
+          row.count++;
+          for (let m = 0; m < NM; m++) row.sum[m] += ex.m[m];
+          return;
+        }
+        byKey.set(key, pt.rows.length);
+        pt.rows.push({ values: vals, count: 1, sum: ex.m.slice(), exec: ix });
+      });
+    }
+    if (mode === "combos") pt.rows.sort((a, b) => (b.count - a.count) || (a.exec - b.exec));
+    return pt;
+  }
+
+  // nearest-rank percentiles of each metric, per query
+  distributions() {
+    const rank = (v, p) => v[Math.max(0, Math.floor((p * v.length + 99) / 100) - 1)];
+    return this.fams.map(f => {
+      const fd = { id: f.id, count: f.execs.length, sum: [0, 0, 0, 0, 0, 0], d: [null, null, null, null, null, null] };
+      for (const ix of f.execs) for (let m = 0; m < NM; m++) fd.sum[m] += this.execs[ix].m[m];
+      if (f.execs.length) {
+        for (let m = 0; m < NM; m++) {
+          if (!this.has[m]) continue;
+          const v = Float64Array.from(f.execs, ix => this.execs[ix].m[m]).sort();
+          fd.d[m] = { min: v[0], p50: rank(v, 50), p90: rank(v, 90), p95: rank(v, 95), p99: rank(v, 99), max: v[v.length - 1] };
+        }
+      }
+      return fd;
+    });
   }
 
   /* ---------- estatísticas (stats.go) ---------- */
@@ -1621,7 +1696,29 @@ async function analyzeFile(blob, opts) {
 
 // re-reads the statement of one execution straight from the file
 async function readStatementAt(blob, encInfo, off, len) {
-  const b = new Uint8Array(await blob.slice(off, off + len).arrayBuffer());
+  return decodeStatement(new Uint8Array(await blob.slice(off, off + len).arrayBuffer()), encInfo);
+}
+
+// re-reads many statements, one read per window of nearby lines (refs: [{off, len}])
+async function readStatementsAt(blob, encInfo, refs) {
+  const WINDOW = 8 << 20;
+  const out = new Array(refs.length);
+  let i = 0;
+  while (i < refs.length) {
+    const start = refs[i].off;
+    let end = start + refs[i].len, j = i;
+    while (j + 1 < refs.length && refs[j + 1].off >= start && refs[j + 1].off + refs[j + 1].len - start <= WINDOW) {
+      j++;
+      end = Math.max(end, refs[j].off + refs[j].len);
+    }
+    const b = new Uint8Array(await blob.slice(start, end).arrayBuffer());
+    for (let k = i; k <= j; k++) out[k] = decodeStatement(b.subarray(refs[k].off - start, refs[k].off - start + refs[k].len), encInfo);
+    i = j + 1;
+  }
+  return out;
+}
+
+function decodeStatement(b, encInfo) {
   const line = new TextDecoder(encInfo.enc).decode(b);
   const fmt = encInfo.fmt || { kind: "tsv" };
   let raw;
@@ -1636,7 +1733,7 @@ async function readStatementAt(blob, encInfo, off, len) {
 }
 
 return {
-  Engine, analyzeFile, readStatementAt, testScript, parseRPC, normalizeSQL, detectPatterns, tokenize,
+  Engine, analyzeFile, readStatementAt, readStatementsAt, testScript, parseRPC, normalizeSQL, detectPatterns, tokenize,
   sqlEqual, unescapeStmt, splitExportLine, parseDelimited, detectFormat, detectEncoding, likeToRegExp, EXPORT_COLS,
   _internal: { utf8Len, utf8Prefix, cmpStr, clipValue, classOf, normDate, parseNum },
 };

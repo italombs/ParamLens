@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -79,5 +80,47 @@ func TestEqual(t *testing.T) {
 		if got, _ := sqlEqual(c.a, c.b); got != c.want {
 			t.Errorf("%s = %s -> %v", c.a, c.b, got)
 		}
+	}
+}
+
+func TestParamTableFullValues(t *testing.T) {
+	long := strings.Repeat("x", 300)
+	stmts := []string{
+		`exec sp_executesql N'SELECT * FROM orders WHERE customer_id = @c AND (@s = N'''' OR status = @s) AND region IN (1, 2)',N'@c int,@s nvarchar(400)',@c=7,@s=N'` + long + `'`,
+		`exec sp_executesql N'SELECT * FROM orders WHERE customer_id = @c AND (@s = N'''' OR status = @s) AND region IN (3)',N'@c int,@s nvarchar(400)',@c=7,@s=N'` + long + `'`,
+		`exec sp_executesql N'SELECT * FROM orders WHERE customer_id = @c AND (@s = N'''' OR status = @s) AND region IN (1, 2)',N'@c int,@s nvarchar(10)',@c=8`,
+	}
+	e, err := NewEngine(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+	for i, s := range stmts {
+		e.Ingest(Row{Stmt: s, M: Metrics{int64(100 * (i + 1)), 0, int64(i + 1)}, Has: [NMetrics]bool{true, false, true}})
+	}
+	e.Finish()
+	if r, _ := ParseRPC(stmts[0]); strings.HasPrefix(r.Params[1].Value, "'"+long) {
+		t.Fatal("ParseRPC should cut long values")
+	}
+	pt, err := e.ParamTable(0, "execs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pt.Params) != 2 || pt.Lists != 1 || len(pt.Rows) != 3 || pt.Failed != 0 {
+		t.Fatalf("%+v", pt)
+	}
+	if pt.Rows[0].Values[1] != "'"+long+"'" || pt.Rows[2].Values[1] != noValue || pt.Rows[2].Values[0] != "8" {
+		t.Errorf("values %q", pt.Rows[2].Values)
+	}
+	if pt.Decl != "@c int,@s nvarchar(400)" || len(pt.Params[1].Types) != 2 {
+		t.Errorf("decl %q types %+v", pt.Decl, pt.Params[1].Types)
+	}
+	pc, _ := e.ParamTable(0, "combos")
+	if len(pc.Rows) != 2 || pc.Rows[0].Count != 2 || pc.Rows[0].Sum[MDur] != 300 {
+		t.Errorf("combos %+v", pc.Rows)
+	}
+	d := e.Distributions()
+	if len(d) != 1 || d[0].D[MDur] == nil || d[0].D[MCpu] != nil || d[0].D[MDur].P50 != 200 || d[0].D[MDur].Max != 300 || d[0].D[MReads].P95 != 3 {
+		t.Errorf("dist %+v", d[0])
 	}
 }
