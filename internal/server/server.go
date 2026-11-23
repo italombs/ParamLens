@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync"
@@ -79,6 +80,10 @@ func Run(o Options) {
 	api("/api/family", hFamily)
 	api("/api/combos", hCombos)
 	api("/api/sample", hSample)
+	api("/api/params", hParams)
+	api("/api/dist", hDist)
+	api("/api/insert", hInsert)
+	api("/api/prefs", hPrefs)
 	api("/api/export", hExport)
 	api("/api/quit", hQuit)
 
@@ -475,4 +480,82 @@ func hQuit(w http.ResponseWriter, r *http.Request) {
 		cleanup()
 		os.Exit(0)
 	}()
+}
+
+// hParams: exact parameter values of one query (one row per execution or per combination).
+func hParams(w http.ResponseWriter, r *http.Request) {
+	e, _, _ := curEngine()
+	if e == nil {
+		writeErr(w, fmt.Errorf("no finished analysis"))
+		return
+	}
+	id, _ := strconv.Atoi(r.URL.Query().Get("id"))
+	pt, err := e.ParamTable(id, r.URL.Query().Get("mode"))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, pt)
+}
+
+// hDist: metric percentiles of every query (used to compare two captures).
+func hDist(w http.ResponseWriter, r *http.Request) {
+	e, _, _ := curEngine()
+	if e == nil {
+		writeErr(w, fmt.Errorf("no finished analysis"))
+		return
+	}
+	writeJSON(w, e.Distributions())
+}
+
+// hInsert writes a parameter table into a SQL Server table. The rows come from the page, so
+// this also works for captures analyzed by the JS engine (file mode).
+func hInsert(w http.ResponseWriter, r *http.Request) {
+	var req source.InsertReq
+	if err := readJSON(r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	ctx, cancel := reqCtx(r, 30*time.Minute)
+	defer cancel()
+	n, err := source.InsertParams(ctx, req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, map[string]int{"rows": n})
+}
+
+// hPrefs keeps interface preferences (the language) in the user profile: the port, and so the
+// origin of the page and its localStorage, changes on every run.
+func hPrefs(w http.ResponseWriter, r *http.Request) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	file := filepath.Join(dir, "ParamLens", "prefs.json")
+	var p struct {
+		Lang string `json:"lang"`
+	}
+	if r.Method == http.MethodPost {
+		if err := readJSON(r, &p); err != nil {
+			writeErr(w, err)
+			return
+		}
+		if p.Lang != "en" && p.Lang != "pt-BR" {
+			writeErr(w, fmt.Errorf("unknown language"))
+			return
+		}
+		data, _ := json.Marshal(p)
+		if os.MkdirAll(filepath.Dir(file), 0o755) == nil {
+			os.WriteFile(file, data, 0o644) // best effort: a preference
+		}
+		writeJSON(w, p)
+		return
+	}
+	if data, err := os.ReadFile(file); err == nil {
+		json.Unmarshal(data, &p)
+	}
+	writeJSON(w, p)
 }
