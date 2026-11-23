@@ -24,7 +24,10 @@ ParamLens skips them and tells you how many were skipped.
 
 ### `ParamLens.exe` (connects to SQL Server)
 
-1. Run it. A console window shows the local address and the browser opens on it.
+1. Run it. The interface opens in its own window (one item in the taskbar); closing the window quits
+   ParamLens. The window uses WebView2, the Edge engine that comes with Windows 10 and 11; if it is
+   missing, ParamLens opens your browser instead, with a console window that quits the program when
+   closed. `ParamLens.exe -browser` always uses the browser.
 2. **Connection:** server (`SRV01`, `SRV01\INSTANCE`, `10.0.0.5,1433`), Windows or SQL Server
    authentication, encryption. Or paste a connection string.
 3. **Event source:**
@@ -64,16 +67,61 @@ Details of the accepted files: [export-format.md](export-format.md).
   - *Parameters* — click a row to see the value distribution and the cost per value.
   - *Value combinations* — pick parameters and see how their values occur together; export as CSV.
   - *Sample* — the real statement of one execution and a test script (`DECLARE` + SQL) for SSMS.
+  - *Export parameters* — the parameter values of every call of the query; see [section 4](#4-export-the-parameters-of-a-query).
 - **Not parsed** — rows that could not be read, with the reason, plus details of the file in the
   `.html` (encoding, period, skipped events).
 
 **Export HTML report** saves a single offline page with the whole analysis to share with the team
 (without the per-execution samples). The report can also switch language.
 
+## 4. Export the parameters of a query
+
+**Export parameters** (in *Selected query*) gives one row per **execution**, or per **distinct
+combination of values** (with the number of executions), with one column per parameter and the metrics.
+The values are read again from the capture and are complete: the tables on screen cut long values at
+200 bytes, the export does not. Columns get the type of the parameter declaration (the widest one when
+the application sent different sizes); duration and CPU are in microseconds.
+
+- **SQL script** — `CREATE TABLE` + `INSERT`, with `SET DATEFORMAT ymd` so dates do not depend on the
+  login language. Optionally a **replay loop** that calls the query once per row with `sp_executesql`,
+  the application's text and the parameter types, so each call reaches Query Store and Extended Events.
+  The loop only runs after you change `@run = 0` to `@run = 1`.
+- **CSV** — `;` separator, UTF-8; NULL is an empty field.
+- **Insert into a database** (`.exe` only) — creates the table if needed and inserts all rows in one
+  transaction, on the connection of the start screen or on another server you connect to in the dialog.
+  *Drop the table if it already exists* replaces it; otherwise the rows are appended.
+
+Inline `IN (…)` lists are part of the SQL text, not parameters, so they are not exported.
+
+## 5. Compare a query before and after a rewrite
+
+The **Compare** tab measures a rewrite (for example both versions run by SQLQueryStress):
+
+- **Both runs in the same capture** — click **Compare two queries of this analysis** and pick the
+  original in *A* and the rewrite in *B*.
+- **The rewrite in another capture** (another table, another `.xel` file or an exported file) — click
+  **Compare with another capture…**. The analysis on screen is kept as *A* and the source screen opens,
+  as for a new analysis: choose the table, the `.xel` or the file of the rewrite and click **Analyze**.
+  The comparison opens as soon as the analysis finishes. **Swap A and B** helps when the rewrite was
+  captured first.
+
+For each metric (duration, CPU, logical and physical reads, writes, rows) it shows the average, min,
+p50, p90, p95, p99, max and total of both, and the change relative to A (negative = B is lower). It warns
+when the average number of rows returned differs (the rewrite may not return the same result) and when
+either side has few executions.
+
+**Save to a file** writes the kept capture as a small `.json` (the SQL text of the queries, shortened,
+and their metric percentiles; no parameter values), so the comparison can be finished another day with
+**Load a saved capture**.
+
 ## FAQ
 
 **Windows blocks the `.exe` (SmartScreen).** The executable is not signed yet (signing through the
 SignPath Foundation is pending). If your company policy offers no "Run anyway", use `ParamLens.html`.
+
+**The browser opens instead of the app window.** The WebView2 runtime is missing (it is part of Windows
+11 and of up-to-date Windows 10). Everything works the same in the browser; close the console window to
+quit.
 
 **Does any data leave my machine?** No. See [SECURITY.md](../SECURITY.md).
 

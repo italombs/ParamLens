@@ -26,7 +26,7 @@ Every version ever published stays available on the [Releases](../../releases) p
 
 **With the `.exe`**
 
-1. Run `ParamLens.exe`: it opens the interface in your browser.
+1. Run `ParamLens.exe`: the interface opens in its own window (closing it quits).
 2. Connect to the SQL Server and pick the table with the captured events (or a `.xel` file on the server).
 3. Click **Analyze** and start with the **All findings** tab.
 
@@ -53,6 +53,12 @@ More in the [user guide](docs/user-guide.md).
 - **Findings** ranked by severity: dominant values with unequal cost (parameter sniffing), diverging
   parameter declarations, constant parameters, disproportionately expensive combinations.
 - **Test script:** `DECLARE` + SQL of a real execution, ready for SSMS.
+- **Parameter export:** the exact values of every call of a query (one row per execution or per
+  combination) as a SQL script with an optional replay loop for Query Store, as CSV, or inserted straight
+  into a table of your choice.
+- **Before × after comparison:** pick the original query and the rewrite, in the same capture or in two
+  captures (another table, `.xel` or file),
+  and get the change in average, p50, p95, p99 and max of duration, CPU and reads.
 - **HTML report** you can export and open offline.
 
 ## Privacy

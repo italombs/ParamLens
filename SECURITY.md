@@ -12,8 +12,14 @@ everything local:
 - Statements read by the `.exe` are written to a temporary file (for the per-execution samples) that is
   deleted when the program exits normally.
 - `ParamLens.html` reads the exported file inside the browser; nothing is uploaded.
+- The `.exe` shows its interface in a WebView2 window (the Edge engine of Windows) that only loads the
+  local page; its browser profile (cache, preferences) lives in `%LOCALAPPDATA%\ParamLens\WebView2`.
 - Exported HTML reports contain the analysis (including parameter values): share them as carefully as
-  the capture itself.
+  the capture itself. The same goes for exported parameters (script, CSV or the table they were inserted
+  into), which hold the complete values of every call. Saved comparison baselines hold the shortened SQL
+  text of the queries and their metrics, no parameter values.
+- **Insert into a database** writes only to the server, database and table chosen in the dialog, on a
+  connection opened by the user.
 
 ## Supported versions
 

@@ -3,7 +3,9 @@
 ## Layout
 
 ```
-cmd/paramlens/        entry point: command-line flags, starts the server or writes ParamLens.html
+cmd/paramlens/        entry point: command-line flags, app window or browser, writes ParamLens.html;
+                      winres/ holds the icon, manifest and version resources (go-winres)
+internal/desktop/     native window (WebView2) and console handling on Windows
 internal/engine/      Go engine: T-SQL tokenizer, RPC parser, normalization, statistics, findings
 internal/source/      SQL Server sources (table, .xel), Windows authentication, demo data
 internal/server/      local HTTP server, /api/* endpoints, analysis jobs, report export
@@ -20,7 +22,10 @@ docs/                 user and developer documentation
 | `internal/engine/normalize.go` | SQL normalization into families, IN lists, catch-all detection |
 | `internal/engine/engine.go` | Ingestion and per-execution predicate evaluation |
 | `internal/engine/stats.go` | Statistics, combinations, call shapes, findings (`msg` + `args`) |
+| `internal/engine/extract.go` | Exact parameter values per execution/combination (export) and metric percentiles (comparison) |
 | `internal/source/source.go` | Table and `.xel` queries, connection, demo generator |
+| `internal/source/insert.go` | Writes an exported parameter table into SQL Server (typed columns, one transaction) |
+| `internal/desktop/` | WebView2 window, dark title bar, console only when needed; no-op stubs outside Windows |
 | `internal/server/server.go` | Server, API, jobs, export |
 | `web/index.html` | Interface, translations (`en`, `pt-BR`), file mode, export-query builder |
 | `web/engine.js` | JavaScript port of the engine + reader of exported files (TSV and CSV) |
@@ -49,7 +54,10 @@ go vet ./...
 go test ./...
 
 # Windows executable and standalone HTML
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o dist/ParamLens.exe ./cmd/paramlens
+# (optional) icon, DPI-aware manifest and version resources, as the release does; without them the
+# window has no icon. The icon is drawn by: go run scripts/make-icon.go cmd/paramlens/winres/icon.png
+(cd cmd/paramlens && go run github.com/tc-hib/go-winres@v0.3.3 make --arch amd64)
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/ParamLens.exe ./cmd/paramlens
 go run ./cmd/paramlens -write-html dist/ParamLens.html
 
 # Go × JS parity
@@ -65,8 +73,14 @@ node scripts/ui-smoke.js dist/ParamLens.html dist/parity/export.tsv dist/paramle
 
 Run locally: `go run ./cmd/paramlens -port 8765` and use **Load sample data**.
 
-Command-line options: `-port` (fixed port), `-no-browser`, `-bind` (default `127.0.0.1`) and
+Command-line options: `-port` (fixed port), `-browser` (default browser instead of the app window),
+`-no-browser` (no window at all, only the link on the console), `-bind` (default `127.0.0.1`) and
 `-write-html <file>`.
+
+The release `.exe` is a GUI program (`-H windowsgui`): without a console it opens the WebView2 window and
+quits when the window closes. In browser mode, or when WebView2 is missing, it attaches to the console
+of the terminal that started it or opens a new one (closing it quits). Builds without `-H windowsgui`
+(`go run`) keep their console, which is handy while developing.
 
 ## Screenshots and the usage GIF
 

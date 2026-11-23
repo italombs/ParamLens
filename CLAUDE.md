@@ -27,9 +27,13 @@ orders/customers/invoices domain. Real captures stay in `sample/` (git-ignored).
 - Driver: `github.com/microsoft/go-mssqldb` **v1.8.2** (v1.9+ requires Go 1.25). Windows auth through SSPI
   (`internal/source/auth_windows.go`); the connection is built as a `sqlserver://` URL (the driver's ADO parser does not
   accept `{}`, a password with `;` would break).
-- The `.exe` serves HTTP on `127.0.0.1:<random port>` (`-bind` changes it, only for containers), opens the
-  browser and requires a per-session token (`X-Token` header or `?t=` for downloads) and checks `Host`
+- The `.exe` serves HTTP on `127.0.0.1:<random port>` (`-bind` changes it, only for containers) and requires a per-session token (`X-Token` header or `?t=` for downloads) and checks `Host`
   (anti DNS-rebinding).
+- The `.exe` is a GUI build (`-H windowsgui`): `internal/desktop` shows the page in a WebView2 window
+  (`github.com/jchv/go-webview2`, pure Go; URL gets `&app=1`, which hides the Quit button) and the process
+  ends when the window closes. `-browser`, `-no-browser` or a missing WebView2 runtime fall back to the browser
+  with a console (`AttachConsole` to the parent terminal or `AllocConsole`). The window icon is resource #1 of
+  `cmd/paramlens/winres/winres.json` (go-winres in the release workflow; the `.syso` is git-ignored).
 - The UI is a single `web/index.html` (vanilla JS, no CDN). `web/web.go` embeds it and injects
   `web/engine.js` at the `<!--ENGINE-->` marker (`web.Page()`, `web.WithStaticData()`). The same assembled page is:
   the `.exe` UI, the standalone `ParamLens.html` (`-write-html`, built by the release workflow) and the
@@ -52,12 +56,15 @@ orders/customers/invoices domain. Real captures stay in `sample/` (git-ignored).
 | `internal/engine/normalize.go` | `NormalizeSQL` (family = normalized SQL; `IN (literals)` lists become `IN (#lista)`), `DetectPatterns` (catch-all OR, var=lit, var=var, IS [NOT] NULL, ISNULL/COALESCE) |
 | `internal/engine/engine.go` | Ingestion: families, per-parameter value dictionary (max 50k distinct), pseudo-parameters for IN lists, statements in a temp file (offset/len) for "sample"; `sqlEqual` approximates SQL Server semantics (CI, implicit conversion, NULL); `TestScript` builds DECLARE + SQL |
 | `internal/engine/stats.go` | Overview, per-family detail, parameter stats (cardinality constant/low(≤30)/high + classes), combinations, call shapes (filter/pass-through per catch-all), findings with severity 1–3 |
+| `internal/engine/extract.go` | `ParamTable` (exact values per execution/combination, re-parsed from the temp file with `ParseRPCFull`, no 200-byte cut) and `Distributions` (nearest-rank p50/p90/p95/p99 per metric); JS: `paramTable` (async, `readStatementsAt`) and `distributions` |
 | `internal/source/source.go` | Sources: table (column mapping, `TRY_CAST`, LIKE/WHERE/TOP filters), `.xel` via `sys.fn_xe_file_target_read_file` + XML, and `RunDemo` (synthetic OutSystems-style data) |
-| `internal/server/server.go` | `server.Run`: server, `/api/*` endpoints, analysis jobs in a goroutine, report export |
-| `cmd/paramlens/main.go` | Flags (`-port`, `-no-browser`, `-bind`, `-write-html`), `version` set by `-ldflags -X main.version` |
+| `internal/source/insert.go` | `InsertParams`: CREATE TABLE (types validated by `ValidType`) + parameterized multi-row INSERTs in one transaction, `SET DATEFORMAT ymd` |
+| `internal/desktop/` | WebView2 window, dark title bar, maximize on small screens, console handling, `Fatal` message box |
+| `internal/server/server.go` | `Listen`/`Serve`/`Banner`: server, `/api/*` endpoints (incl. `/api/params`, `/api/dist`, `/api/insert`), analysis jobs in a goroutine, report export |
+| `cmd/paramlens/main.go` | Flags (`-port`, `-browser`, `-no-browser`, `-bind`, `-write-html`), window or browser, `version` set by `-ldflags -X main.version` |
 | `web/web.go` | `go:embed` of `index.html` + `engine.js`; `TestAssembledPage` checks the markers |
 | `web/engine.js` | JS engine + reader of the exported file (streamed, encoding detection, offsets for samples) |
-| `web/index.html` | UI, i18n dictionaries, file mode (`localApi` mimics the `/api/*` endpoints), export-query builder |
+| `web/index.html` | UI, i18n dictionaries, file mode (`localApi` mimics the `/api/*` endpoints), export-query builder, parameter export (script/CSV/insert payload built in JS for both engines), Compare tab (baseline snapshot kept in the page, saved as `.json`) |
 
 Internal metrics: `duration` and `cpu_time` in **microseconds** (XE default; ms option on the source).
 Default cost metric: logical reads → CPU → duration (the first one available).
@@ -67,7 +74,7 @@ columns: event, timestamp, 6 metrics, escaped statement) or any CSV/TXT with a h
 matched by name, RFC 4180 quoting, separator detected; `detectFormat`/`forEachRecord` in `engine.js`).
 
 ## Current state
-- Repository layout (since v1.3.0): `cmd/`, `internal/{engine,source,server}`, `web/`, `scripts/`, `docs/`.
+- Repository layout (since v1.3.0): `cmd/`, `internal/{engine,source,server,desktop}`, `web/`, `scripts/`, `docs/`.
   User-facing README; developer notes in `docs/development.md`; `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`.
 - Published at https://github.com/italombs/ParamLens (public, MIT). Releases `v1.0.0` (exe) and
   `v1.1.0` (exe + html + i18n). Every release keeps its assets; README links `releases/latest/download/`.
@@ -77,8 +84,11 @@ matched by name, RFC 4180 quoting, separator detected; `detectFormat`/`forEachRe
   `timestamp (UTC)`, `duration`, `cpu_time`, `logical_reads`, `statement`) mixing `rpc_completed`,
   `sp_statement_completed` and `sql_statement_completed`. A CSV sample of it (kept locally in `sample/`,
   git-ignored: it holds sensitive data — never commit or print its values) parses 70/70 rpc events.
-- **The `.exe` has never run against a real SQL Server.** Validate first: connection (Windows/SQL auth,
-  named instance, encrypt), table/column listing, table source query, `.xel` query.
+- Validated on 2026-11-23 against SQL Server 2022 in Docker (SQL auth, encrypt=true, login language Brazilian):
+  connection, database/table/column listing, table source, `.xel` source, parameter insert and the generated
+  script with the replay loop. Still unvalidated: Windows auth (SSPI), named instances, the user's real server.
+- The WebView2 window was checked on this Windows 11 machine (one taskbar item, no console, closing it ends the
+  process and removes the temp file).
 - The generated export queries/bcp command were not yet run on the real server.
 - On the company PC the unsigned `.exe` is blocked by SmartScreen **without** a "Run anyway" option.
 - SignPath Foundation application submitted on 2026-11-20 (maintainer type: individual); waiting for the answer.
@@ -86,9 +96,10 @@ matched by name, RFC 4180 quoting, separator detected; `detectFormat`/`forEachRe
   `SIGNPATH_ORGANIZATION_ID` and the secret `SIGNPATH_API_TOKEN` exist).
 
 ## Ideas
-Time-window filter (the export already carries the timestamp), comparing two captures, detecting a
+Time-window filter (the export already carries the timestamp), detecting a
 `LEFT JOIN` used only as a filter (`NOT EXISTS` candidate), per-statement cost inside an RPC using
-`sp_statement_completed` (needs `attach_activity_id`), executable icon, Web Worker for the JS engine.
+`sp_statement_completed` (needs `attach_activity_id`), Web Worker for the JS engine, per-execution parameter declaration in the
+export (the replay uses the widest types when declarations vary), timestamps in the parameter export.
 
 ## Conventions
 - Docs in English. Code and identifiers in English. UI text only through the dictionaries in `index.html`
@@ -99,5 +110,5 @@ Time-window filter (the export already carries the timestamp), comparing two cap
 - `web/engine.js` is inlined: it must not contain `</script` or `<!--` (checked by `TestAssembledPage`).
 - This machine has no Go or Node: use Docker (`golang:1.24-alpine`, `node:22-alpine`,
   `mcr.microsoft.com/playwright:v1.49.1-noble`).
-- Windows build: `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o dist/ParamLens.exe ./cmd/paramlens`. Local output goes to `dist/` (git-ignored); binaries are published only on GitHub Releases, never committed.
+- Windows build: `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/ParamLens.exe ./cmd/paramlens` (icon: `go-winres make` in `cmd/paramlens` first). Local output goes to `dist/` (git-ignored); binaries are published only on GitHub Releases, never committed.
 - Layout and commands: `docs/development.md`. Run locally: `go run ./cmd/paramlens -port 8765` and use "Load sample data" to test the UI without a server.
