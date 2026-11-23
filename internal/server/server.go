@@ -24,12 +24,19 @@ import (
 	"github.com/italombs/ParamLens/web"
 )
 
-// Options configures Run.
+// Options configures Listen.
 type Options struct {
-	Version   string
-	Port      int    // 0 = automatic
-	Bind      string // listen address; 127.0.0.1 unless inside a container
-	NoBrowser bool
+	Version string
+	Port    int    // 0 = automatic
+	Bind    string // listen address; 127.0.0.1 unless inside a container
+}
+
+// Server is the listening local server.
+type Server struct {
+	URL     string // interface address, with the session token
+	version string
+	ln      net.Listener
+	srv     *http.Server
 }
 
 type Job struct {
@@ -47,8 +54,8 @@ var (
 	token string
 )
 
-// Run starts the server and blocks until the process ends.
-func Run(o Options) {
+// Listen opens the local port and prepares the routes; Serve starts answering.
+func Listen(o Options) (*Server, error) {
 	if o.Bind == "" {
 		o.Bind = "127.0.0.1"
 	}
@@ -58,13 +65,10 @@ func Run(o Options) {
 
 	ln, err := net.Listen("tcp", net.JoinHostPort(o.Bind, strconv.Itoa(o.Port)))
 	if err != nil {
-		fmt.Println("Could not open the local port:", err)
-		waitExit()
-		return
+		return nil, fmt.Errorf("could not open the local port: %w", err)
 	}
 	addr := ln.Addr().String()
 	_, lport, _ := net.SplitHostPort(addr)
-	u := "http://127.0.0.1:" + lport + "/?t=" + token
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", serveIndex)
@@ -87,40 +91,42 @@ func Run(o Options) {
 	api("/api/export", hExport)
 	api("/api/quit", hQuit)
 
+	return &Server{
+		URL:     "http://127.0.0.1:" + lport + "/?t=" + token,
+		version: o.Version,
+		ln:      ln,
+		srv:     &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second},
+	}, nil
+}
+
+// Banner prints the console header (console and browser modes).
+func (s *Server) Banner() {
 	fmt.Println("==============================================")
-	fmt.Println(" ParamLens " + o.Version + " — parameter profiling for rpc_completed")
+	fmt.Println(" ParamLens " + s.version + " — parameter profiling for rpc_completed")
 	fmt.Println("==============================================")
-	fmt.Println(" Interface: " + u)
+	fmt.Println(" Interface: " + s.URL)
 	fmt.Println(" Only accepts connections from this machine (127.0.0.1).")
 	fmt.Println(" Close this window to quit.")
 	fmt.Println()
+}
 
-	if !o.NoBrowser {
-		go func() {
-			time.Sleep(300 * time.Millisecond)
-			openBrowser(u)
-		}()
-	}
+// Serve answers requests until the process ends; Ctrl+C cleans up and quits.
+func (s *Server) Serve() error {
 	go func() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
 		<-c
-		cleanup()
+		Cleanup()
 		os.Exit(0)
 	}()
-	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
-	if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
-		fmt.Println("Error:", err)
-		waitExit()
+	if err := s.srv.Serve(s.ln); err != nil && err != http.ErrServerClosed {
+		return err
 	}
+	return nil
 }
 
-func waitExit() {
-	fmt.Println("Press Enter to exit.")
-	fmt.Scanln()
-}
-
-func cleanup() {
+// Cleanup cancels the running analysis and removes its temporary file.
+func Cleanup() {
 	jobMu.Lock()
 	defer jobMu.Unlock()
 	if job != nil {
@@ -131,7 +137,8 @@ func cleanup() {
 	}
 }
 
-func openBrowser(u string) {
+// OpenBrowser opens the interface in the default browser.
+func OpenBrowser(u string) {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
@@ -477,7 +484,7 @@ func hQuit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"ok": "1"})
 	go func() {
 		time.Sleep(200 * time.Millisecond)
-		cleanup()
+		Cleanup()
 		os.Exit(0)
 	}()
 }

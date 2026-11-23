@@ -33,18 +33,16 @@ jobs:
       - name: Tests
         run: go test ./...
 
-      - name: Executable metadata (name, version, copyright)
+      # icon (resource #1, loaded by the app window), DPI-aware manifest, name, version and copyright:
+      # cmd/paramlens/winres/winres.json
+      - name: Executable resources
         shell: bash
         working-directory: cmd/paramlens
         run: |
           go install github.com/tc-hib/go-winres@v0.3.3
-          go-winres simply --arch amd64 --manifest cli \
-            --product-name "ParamLens" \
-            --file-description "ParamLens - parameter profiling for rpc_completed (SQL Server Extended Events)" \
+          go-winres make --arch amd64 \
             --product-version "${{ steps.ver.outputs.file_version }}" \
-            --file-version "${{ steps.ver.outputs.file_version }}" \
-            --copyright "Copyright (c) 2026 Italo Mesquita - MIT License" \
-            --original-filename "ParamLens.exe"
+            --file-version "${{ steps.ver.outputs.file_version }}"
 
       - name: Build
         shell: bash
@@ -54,7 +52,7 @@ jobs:
           CGO_ENABLED: '0'
         run: |
           mkdir -p dist
-          go build -trimpath -ldflags "-s -w -X main.version=${{ steps.ver.outputs.version }}" -o dist/ParamLens.exe ./cmd/paramlens
+          go build -trimpath -ldflags "-s -w -H windowsgui -X main.version=${{ steps.ver.outputs.version }}" -o dist/ParamLens.exe ./cmd/paramlens
 
       - name: Standalone HTML version (offline)
         shell: bash
