@@ -15,8 +15,15 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
   change between calls). `IN` lists go as `nvarchar(max)` with the values separated by commas, ready
   for `STRING_SPLIT`; the replay loop then runs the query with those values as parameters
   (`IN (SELECT value FROM STRING_SPLIT(@list, N','))`).
+- **Executions** of a query: every call with its date and time and metrics, or grouped per minute, 5 or
+  15 minutes, hour, day, hour of the day or day of the week (count, average, maximum and total), in local
+  time or UTC, sortable and saved as CSV. The timestamp is read from the `.xel`, from the timestamp column
+  of a table (new in the column mapping) and from exported files.
 
 ### Changed
+- The sample data spreads its calls over three working days (timestamps also in `-write-demo`).
+- Query list: sort by the total or the average per execution of logical reads, CPU or duration (the row
+  shows that metric), besides executions and findings.
 - Parameter export by distinct combination now also tells combinations apart by their `IN` list values
   (regrouped when that column is left out).
 - README and feature tour: new usage GIF and screenshots of the parameter export and of the before × after

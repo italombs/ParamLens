@@ -86,6 +86,7 @@ func Listen(o Options) (*Server, error) {
 	api("/api/sample", hSample)
 	api("/api/params", hParams)
 	api("/api/dist", hDist)
+	api("/api/timeline", hTimeline)
 	api("/api/insert", hInsert)
 	api("/api/prefs", hPrefs)
 	api("/api/export", hExport)
@@ -503,6 +504,22 @@ func hParams(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, pt)
+}
+
+// hTimeline: the executions of one query with their timestamps (grouped by the page).
+func hTimeline(w http.ResponseWriter, r *http.Request) {
+	e, _, _ := curEngine()
+	if e == nil {
+		writeErr(w, fmt.Errorf("no finished analysis"))
+		return
+	}
+	id, _ := strconv.Atoi(r.URL.Query().Get("id"))
+	tl, err := e.Timeline(id)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, tl)
 }
 
 // hDist: metric percentiles of every query (used to compare two captures).

@@ -57,7 +57,7 @@ Details of the accepted files: [export-format.md](export-format.md).
 
 - **All findings** — start here. Each finding has a severity (high / medium / info), an explanation, the
   SQL snippet and a suggestion. They are sorted by severity and by the weight of the query.
-- **Queries** (left) — one entry per distinct SQL text ("family"), sorted by cost. Inline `IN (…)` lists
+- **Queries** (left) — one entry per distinct SQL text ("family"), sorted by total cost (logical reads, else CPU, else duration). The sort menu also orders them by the total or the average per execution of logical reads, CPU or duration, by executions or by findings. Inline `IN (…)` lists
   are normalized, so queries that only differ in those lists are grouped.
 - **Selected query:**
   - *Catch-all predicates* — for each `@p = x OR …`, the % of executions in which the parameter side is
@@ -68,6 +68,11 @@ Details of the accepted files: [export-format.md](export-format.md).
   - *Value combinations* — pick parameters and see how their values occur together; export as CSV.
   - *Sample* — the real statement of one execution and a test script (`DECLARE` + SQL) for SSMS.
   - *Export parameters* — the parameter values of every call of the query; see [section 4](#4-export-the-parameters-of-a-query).
+  - *Executions* — every call of the query with its date and time and metrics, one per row or grouped per
+    minute, 5 or 15 minutes, hour, day, hour of the day or day of the week (count, average, maximum and
+    total). Times are shown in the local time of your computer or in UTC; click a column to sort, *sample*
+    opens the statement of that call, and **CSV** saves the view. A table source needs its timestamp column
+    (chosen automatically when it is called `timestamp (UTC)` or `timestamp`).
 - **Not parsed** — rows that could not be read, with the reason, plus details of the file in the
   `.html` (encoding, period, skipped events).
 

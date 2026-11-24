@@ -117,6 +117,8 @@ tr.click:hover td{background:var(--soft)}
 .chip{border:1px solid var(--line);border-radius:14px;padding:2px 10px;font-size:12px;cursor:pointer;font-family:var(--mono);background:var(--panel)}
 .chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .scroll{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:8px}
+.tlBar{display:inline-block;width:70px;height:8px;margin-right:8px;background:var(--line);border-radius:4px;overflow:hidden;vertical-align:middle}
+.tlBar b{display:block;height:100%;background:var(--bar)}
 pre.sql{font-family:var(--mono);font-size:12px;background:var(--soft);padding:10px;border-radius:8px;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto;margin:0}
 .overlay{position:fixed;inset:0;background:rgba(10,14,20,.45);display:flex;align-items:center;justify-content:center;z-index:20}
 .modal{background:var(--panel);border-radius:12px;padding:18px;width:min(920px,94vw);max-height:90vh;display:flex;flex-direction:column;gap:10px;border:1px solid var(--line)}
@@ -198,6 +200,7 @@ ol.steps li{margin:2px 0}
       <div class="maps">
         <label class="f"><span>Statement (exec sp_executesql …) *</span><select id="m_stmt"></select></label>
         <label class="f"><span data-i18n="col.ev"></span><select id="m_name"></select></label>
+        <label class="f"><span data-i18n="col.ts"></span><select id="m_ts"></select></label>
         <label class="f"><span>duration</span><select id="m_duration"></select></label>
         <label class="f"><span>cpu_time</span><select id="m_cpu"></select></label>
         <label class="f"><span>logical_reads</span><select id="m_reads"></select></label>
@@ -310,7 +313,7 @@ ol.steps li{margin:2px 0}
       <div class="head">
         <div class="row"><b class="nf">Queries</b><span class="hint" id="famCount"></span>
           <select id="famSort" class="nf" style="width:auto">
-            <option value="cost" data-i18n="sort.cost"></option><option value="execs" data-i18n="sort.execs"></option><option value="sev" data-i18n="sort.sev"></option></select></div>
+            </select></div>
         <input type="text" id="famFilter" data-i18n-ph="res.filter" style="margin-top:8px">
       </div>
       <div class="flist" id="famList"></div>
@@ -335,6 +338,18 @@ ol.steps li{margin:2px 0}
   </div>
 </div>
 
+<div class="overlay hidden" id="tlOv">
+  <div class="modal" style="width:min(1100px,96vw)">
+    <div class="row"><b class="nf" data-i18n="tl.title"></b><div></div><button class="btn nf" id="btnTlCsv">CSV</button><button class="btn nf" id="btnCloseTl" data-i18n="close"></button></div>
+    <div class="row">
+      <label class="f"><span data-i18n="tl.group"></span>
+        <select id="tlGroup"><option value="exec" data-i18n="tl.gExec"></option><option value="m1" data-i18n="tl.gMin"></option><option value="m5" data-i18n="tl.g5"></option><option value="m15" data-i18n="tl.g15"></option><option value="h" data-i18n="tl.gHour"></option><option value="d" data-i18n="tl.gDay"></option><option value="hod" data-i18n="tl.gHod"></option><option value="dow" data-i18n="tl.gDow"></option></select></label>
+      <label class="f"><span data-i18n="tl.zone"></span><select id="tlZone"><option value="local" id="tlZoneLocal"></option><option value="utc">UTC</option></select></label>
+    </div>
+    <p class="hint" id="tlInfo" style="margin:0"></p>
+    <div class="scroll" id="tlTab" style="max-height:62vh"></div>
+  </div>
+</div>
 <div class="overlay hidden" id="sampleOv">
   <div class="modal">
     <div class="row"><b class="nf" data-i18n="sample.title"></b><div></div>
@@ -427,7 +442,7 @@ en: {
   "src.filters":"Filters", "src.like":"Statement LIKE (optional)", "src.where":"Extra WHERE (optional, T-SQL)", "src.top":"Limit to N rows (0 = all)",
   "src.normLit":"Group queries that differ only in literals", "src.analyze":"Analyze", "src.preview":"Show query",
   "loading":"loading…", "noTables":"— no tables —", "tblRows":"{0} rows", "none":"(none)",
-  "col.ev":"Event name", "col.ts":"Date/time",
+  "col.ev":"Event name", "col.ts":"Timestamp", "col.ts":"Date/time",
   "file.title":"1. Exported file", "file.demoHint":"Synthetic data, analyzed in your browser: nothing is uploaded.", "file.drop":"Drop the file here", "file.dropHint":"or click to choose · TSV from the export described beside, or a CSV/TXT with a header row (e.g. SELECT * saved by SSMS)",
   "file.event":"Event to analyze", "file.like":"Statement LIKE (optional; %, _ and [..] as in T-SQL)",
   "file.private":"The file is read only in this browser: nothing is sent anywhere.", "file.back":"Back to the SQL Server connection",
@@ -442,14 +457,14 @@ en: {
   "exp.s3":"The SSMS grid cuts each cell at 65,535 characters: longer statements show up here as \"cut\". In that case, use bcp.",
   "exp.s4":"Shortcut: a plain SELECT * of the event table saved as CSV also works (columns are matched by name), as long as SSMS quotes the fields: Tools › Options › Query Results › SQL Server › Results to Grid › \"Quote strings containing list separators when saving .csv results\".",
   "copy":"Copy", "copied":"Copied ✓", "close":"Close", "cancel":"Cancel",
-  "sort.cost":"by cost", "sort.execs":"by executions", "sort.sev":"by findings", "res.filter":"filter by text…",
+  "sort.sum":"{0}: total", "sort.avg":"{0}: average", "sort.execs":"by executions", "sort.sev":"by findings", "res.filter":"filter by text…",
   "tab.findings":"All findings", "tab.family":"Selected query", "tab.fails":"Not parsed",
   "prog.title":"Reading events…", "prog.file":"{0} of the file · ", "prog.line":"{0} rows read · {1} parsed · {2} failed · {3} s",
   "sample.title":"Sample execution", "sample.script":"Test script (DECLARE)", "sample.stmt":"Original statement", "sample.btn":"Sample", "sample.btnSm":"sample",
   "kpi.execs":"Executions", "kpi.distinct":"{0} distinct queries", "kpi.dur":"Total duration", "kpi.cpu":"Total CPU", "kpi.reads":"Logical reads", "kpi.avg":"avg {0}",
   "kpi.fails":"Not parsed", "kpi.failsOf":"{0} of the rows", "kpi.findings":"Findings", "kpi.high":"{0} high priority",
   "kpi.ofTotal":"{0} of total", "kpi.mAvg":"{0} avg", "kpi.maxOf":"{0} of total · max {1}", "kpi.rowsAvg":"rows avg",
-  "fam.count":"{0} of {1}", "fam.execs":"{0} exec · {1}", "fam.findings":"{0} finding(s)", "fam.nothing":"nothing found", "fam.execWord":"executions",
+  "fam.count":"{0} of {1}", "fam.execs":"{0} exec · {1}", "fam.findings":"{0} finding(s)", "fam.nothing":"nothing found", "fam.execWord":"executions", "fam.avg":"{0} avg {1}",
   "fam.proc":"Procedure {0}", "fam.via":"Query via {0}", "fam.sql":"Sample SQL", "fam.declsN":" · {0} parameter declaration(s)",
   "fam.declsT":"Parameter declarations", "fam.decl":"Declaration", "fam.findingsT":"Findings",
   "find.legend":"<span class=\"dot s3\"></span> high &nbsp; <span class=\"dot s2\"></span> medium &nbsp; <span class=\"dot s1\"></span> info — sorted by priority and query weight",
@@ -477,6 +492,12 @@ en: {
   "metrics":["duration","CPU","logical reads","physical reads","writes","rows"],
   "script.header":"-- Generated by ParamLens from a real execution",
   "tab.compare":"Compare",
+  "tl.btn":"Executions", "tl.title":"Executions of this query", "tl.group":"Show", "tl.gExec":"each execution", "tl.gMin":"per minute",
+  "tl.g5":"per 5 minutes", "tl.g15":"per 15 minutes", "tl.gHour":"per hour", "tl.gDay":"per day", "tl.gHod":"per hour of the day (all days together)",
+  "tl.gDow":"per day of the week", "tl.zone":"Time", "tl.local":"local time of this computer ({0})", "tl.info":"{0} executions from {1} to {2}.",
+  "tl.noTs":"{0} execution(s) without a timestamp.", "tl.noTsAll":"The capture has no timestamps, so the executions are listed in capture order. For a table, choose its timestamp column on the source screen.",
+  "tl.cut":"Showing {0} of {1} rows; the CSV has all of them.", "tl.when":"Date and time", "tl.period":"Period", "tl.noTime":"(no timestamp)", "tl.mTot":"{0} total", "tl.mMax":"{0} max",
+  "tl.groups":"{0} period(s).",
   "px.btn":"Export parameters", "px.title":"Export the parameters of this query",
   "px.info":"{0} executions · {1} parameter(s). The values are read again from the capture, complete (the tables cut long values at 200 bytes).",
   "px.rows":"One row per", "px.execs":"execution", "px.combos":"distinct combination of values", "px.table":"Table (schema.name)",
@@ -525,7 +546,7 @@ en: {
   "src.filters":"Filtros", "src.like":"Statement LIKE (opcional)", "src.where":"WHERE adicional (opcional, T-SQL)", "src.top":"Limitar a N linhas (0 = todas)",
   "src.normLit":"Agrupar queries que só mudam literais", "src.analyze":"Analisar", "src.preview":"Ver query",
   "loading":"carregando…", "noTables":"— nenhuma tabela —", "tblRows":"{0} linhas", "none":"(nenhuma)",
-  "col.ev":"Nome do evento", "col.ts":"Data/hora",
+  "col.ev":"Nome do evento", "col.ts":"Data e hora", "col.ts":"Data/hora",
   "file.title":"1. Arquivo exportado", "file.demoHint":"Dados sintéticos, analisados no seu navegador: nada é enviado.", "file.drop":"Arraste o arquivo aqui", "file.dropHint":"ou clique para escolher · TSV da exportação ao lado, ou um CSV/TXT com cabeçalho (ex.: SELECT * salvo pelo SSMS)",
   "file.event":"Evento analisado", "file.like":"Statement LIKE (opcional; %, _ e [..] como no T-SQL)",
   "file.private":"O arquivo é lido só neste navegador: nada é enviado para lugar nenhum.", "file.back":"Voltar para a conexão com o SQL Server",
@@ -540,14 +561,14 @@ en: {
   "exp.s3":"O grid do SSMS corta cada célula em 65.535 caracteres: statements maiores aparecem como \"cortados\" aqui. Nesse caso, use o bcp.",
   "exp.s4":"Atalho: um SELECT * simples da tabela de eventos salvo como CSV também funciona (as colunas são reconhecidas pelo nome), desde que o SSMS coloque aspas nos campos: Tools › Options › Query Results › SQL Server › Results to Grid › \"Quote strings containing list separators when saving .csv results\".",
   "copy":"Copiar", "copied":"Copiado ✓", "close":"Fechar", "cancel":"Cancelar",
-  "sort.cost":"por custo", "sort.execs":"por execuções", "sort.sev":"por achados", "res.filter":"filtrar por texto…",
+  "sort.sum":"{0}: total", "sort.avg":"{0}: média", "sort.execs":"por execuções", "sort.sev":"por achados", "res.filter":"filtrar por texto…",
   "tab.findings":"Todos os achados", "tab.family":"Query selecionada", "tab.fails":"Não interpretados",
   "prog.title":"Lendo eventos…", "prog.file":"{0} do arquivo · ", "prog.line":"{0} linhas lidas · {1} interpretadas · {2} com falha · {3} s",
   "sample.title":"Execução de exemplo", "sample.script":"Script de teste (DECLARE)", "sample.stmt":"Statement original", "sample.btn":"Exemplo", "sample.btnSm":"exemplo",
   "kpi.execs":"Execuções", "kpi.distinct":"{0} queries distintas", "kpi.dur":"Duração total", "kpi.cpu":"CPU total", "kpi.reads":"Logical reads", "kpi.avg":"média {0}",
   "kpi.fails":"Não interpretados", "kpi.failsOf":"{0} das linhas", "kpi.findings":"Achados", "kpi.high":"{0} de alta prioridade",
   "kpi.ofTotal":"{0} do total", "kpi.mAvg":"{0} média", "kpi.maxOf":"{0} do total · máx {1}", "kpi.rowsAvg":"linhas média",
-  "fam.count":"{0} de {1}", "fam.execs":"{0} exec · {1}", "fam.findings":"{0} achado(s)", "fam.nothing":"nada encontrado", "fam.execWord":"execuções",
+  "fam.count":"{0} de {1}", "fam.execs":"{0} exec · {1}", "fam.findings":"{0} achado(s)", "fam.nothing":"nada encontrado", "fam.execWord":"execuções", "fam.avg":"{0} média {1}",
   "fam.proc":"Procedure {0}", "fam.via":"Query via {0}", "fam.sql":"SQL de exemplo", "fam.declsN":" · {0} declaração(ões) de parâmetros",
   "fam.declsT":"Declarações de parâmetros", "fam.decl":"Declaração", "fam.findingsT":"Achados",
   "find.legend":"<span class=\"dot s3\"></span> alta &nbsp; <span class=\"dot s2\"></span> média &nbsp; <span class=\"dot s1\"></span> informativo — ordenado por prioridade e peso da query",
@@ -575,6 +596,12 @@ en: {
   "metrics":["duração","CPU","logical reads","physical reads","writes","linhas"],
   "script.header":"-- Gerado pelo ParamLens a partir de uma execução real",
   "tab.compare":"Comparar",
+  "tl.btn":"Execuções", "tl.title":"Execuções desta query", "tl.group":"Mostrar", "tl.gExec":"cada execução", "tl.gMin":"por minuto",
+  "tl.g5":"a cada 5 minutos", "tl.g15":"a cada 15 minutos", "tl.gHour":"por hora", "tl.gDay":"por dia", "tl.gHod":"por hora do dia (todos os dias juntos)",
+  "tl.gDow":"por dia da semana", "tl.zone":"Horário", "tl.local":"hora local deste computador ({0})", "tl.info":"{0} execuções de {1} a {2}.",
+  "tl.noTs":"{0} execução(ões) sem data e hora.", "tl.noTsAll":"A captura não tem data e hora, então as execuções aparecem na ordem da captura. Para uma tabela, escolha a coluna de data e hora na tela da fonte.",
+  "tl.cut":"Mostrando {0} de {1} linhas; o CSV tem todas.", "tl.when":"Data e hora", "tl.period":"Período", "tl.noTime":"(sem data e hora)", "tl.mTot":"{0} total", "tl.mMax":"{0} máx.",
+  "tl.groups":"{0} período(s).",
   "px.btn":"Exportar parâmetros", "px.title":"Exportar os parâmetros desta query",
   "px.info":"{0} execuções · {1} parâmetro(s). Os valores são lidos de novo da captura, completos (as tabelas cortam valores longos em 200 bytes).",
   "px.rows":"Uma linha por", "px.execs":"execução", "px.combos":"combinação distinta de valores", "px.table":"Tabela (schema.nome)",
@@ -669,6 +696,7 @@ function applyLang(){
     if(curTab()==="compare") renderCompare();
   }
   if(!$("#pxOv").classList.contains("hidden")) pxRender();
+  if(!$("#tlOv").classList.contains("hidden")) tlRender();
 }
 $("#langSel").addEventListener("change", e=>{
   LANG = e.target.value; setLocale();
@@ -837,7 +865,7 @@ async function loadTables(){
   }catch(e){ sel.innerHTML=""; $("#anMsg").className="err"; $("#anMsg").textContent=e.message }
 }
 $("#sTable").addEventListener("change", loadColumns);
-const MAPS = {stmt:["statement","batch_text","sql_text"], name:["name","event_name","event"], duration:["duration"], cpu:["cpu_time","cpu"],
+const MAPS = {stmt:["statement","batch_text","sql_text"], name:["name","event_name","event"], ts:["timestamp (utc)","timestamp_utc","timestamp","event_time"], duration:["duration"], cpu:["cpu_time","cpu"],
   reads:["logical_reads","reads"], physical:["physical_reads"], writes:["writes"], rows:["row_count","rows"]};
 async function loadColumns(){
   const tb = tables[+$("#sTable").value]; if(!tb) return;
@@ -932,23 +960,42 @@ function renderTotals(){
 function kpi(l,v,d){return `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div><div class="d">${esc(d||"")}</div></div>`}
 
 function famCost(f){ return costM>=0 ? f.share[costM] : f.execShare }
+let famSortSel = null; // "sum:<metric>", "avg:<metric>", "execs" or "sev"; kept across analyses
+function renderFamSort(){
+  const MN = MNAME(), opts = [];
+  for(const m of [M.reads, M.cpu, M.dur].filter(m=> ov.has[m]))
+    opts.push([`sum:${m}`, t("sort.sum", MN[m])], [`avg:${m}`, t("sort.avg", MN[m])]);
+  opts.push(["execs", t("sort.execs")], ["sev", t("sort.sev")]);
+  if(!opts.some(o=> o[0]===famSortSel)) famSortSel = costM>=0 ? `sum:${costM}` : "execs";
+  $("#famSort").innerHTML = opts.map(([v,l])=> `<option value="${v}"${v===famSortSel?" selected":""}>${esc(l)}</option>`).join("");
+}
 function renderFamList(){
+  renderFamSort();
   const q = $("#famFilter").value.toLowerCase();
   const all = ov.families||[];
   let fs = all.filter(f=>!q || f.title.toLowerCase().includes(q) || (f.proc||"").toLowerCase().includes(q));
-  const s = $("#famSort").value;
-  fs = fs.slice().sort((a,b)=> s==="execs"? b.agg.count-a.agg.count : s==="sev"? (b.maxSev-a.maxSev)||(b.findings-a.findings) : famCost(b)-famCost(a));
+  const s = famSortSel, kind = s.split(":")[0], sm = +s.split(":")[1];
+  // each row shows the chosen metric (share of its total, or the average per execution); else the default cost
+  let val, bar, label;
+  if(kind==="avg"){
+    const mx = Math.max(0, ...all.map(f=> avg(f.agg,sm)));
+    val = f=> avg(f.agg,sm); bar = f=> mx>0 ? val(f)/mx : 0; label = f=> t("fam.avg", fM(sm,val(f)), MNAME()[sm]);
+  } else {
+    const m = kind==="sum" ? sm : costM;
+    val = f=> m>=0 ? f.share[m] : f.execShare; bar = val;
+    label = f=> `${fP(val(f))} ${m>=0? MNAME()[m] : t("fam.execWord")}`;
+  }
+  fs = fs.slice().sort((a,b)=> s==="execs"? b.agg.count-a.agg.count : s==="sev"? (b.maxSev-a.maxSev)||(b.findings-a.findings) : val(b)-val(a));
   $("#famCount").textContent = t("fam.count", fs.length, all.length);
-  const cl = costM>=0? MNAME()[costM] : t("fam.execWord");
   $("#famList").innerHTML = fs.map(f=>`
     <div class="fam ${curFam===f.id?"on":""}" data-id="${f.id}">
       <div class="t">${esc(f.title)}</div>
-      <div class="m"><span class="dot s${f.maxSev}"></span><span>${esc(t("fam.execs", fN(f.agg.count), fP(f.execShare)))}</span><span>${fP(famCost(f))} ${esc(cl)}</span><span>${esc(t("fam.findings", f.findings))}</span></div>
-      <div class="share"><b style="width:${(famCost(f)*100).toFixed(1)}%"></b></div>
+      <div class="m"><span class="dot s${f.maxSev}"></span><span>${esc(t("fam.execs", fN(f.agg.count), fP(f.execShare)))}</span><span>${esc(label(f))}</span><span>${esc(t("fam.findings", f.findings))}</span></div>
+      <div class="share"><b style="width:${(bar(f)*100).toFixed(1)}%"></b></div>
     </div>`).join("") || `<div class="empty">${esc(t("fam.nothing"))}</div>`;
 }
 $("#famFilter").addEventListener("input", renderFamList);
-$("#famSort").addEventListener("change", renderFamList);
+$("#famSort").addEventListener("change", e=>{ famSortSel = e.target.value; renderFamList() });
 $("#famList").addEventListener("click", e=>{ const d=e.target.closest(".fam"); if(d) selectFamily(+d.dataset.id, true) });
 
 function showTab(v){
@@ -1039,6 +1086,7 @@ function renderFamily(){
   const decls = d.decls||[], pats = d.patterns||[], params = d.params||[], fnd = d.findings||[];
   let html = `<div class="card" style="margin-bottom:14px">
     <div class="row"><h2 class="nf" style="margin:0">${esc(s.kind==="proc"? t("fam.proc", s.proc) : t("fam.via", s.kind))}</h2><div></div>
+      ${!STATIC?`<button class="btn sm nf" id="btnTl">${esc(t("tl.btn"))}</button>`:""}
       ${!STATIC?`<button class="btn sm nf" id="btnPx">${esc(t("px.btn"))}</button>`:""}
       ${sampleBtn(a.sample, true)}</div>
     <div class="kpis" style="margin-top:12px">${k.join("")}</div>
@@ -1151,6 +1199,113 @@ function download(name, text, type){
   setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
 }
 
+/* ---------- executions over time ---------- */
+const TL = {fam:null, data:null, sort:null}, TL_MAX = 2000;
+const MCSV = ["duration_us","cpu_us","logical_reads","physical_reads","writes","row_count"];
+const p2 = n=> String(n).padStart(2,"0");
+function tlOffsetLabel(){
+  const o = -new Date().getTimezoneOffset(), a = Math.abs(o);
+  return "UTC" + (o<0?"−":"+") + p2(Math.floor(a/60)) + ":" + p2(a%60);
+}
+// timestamps are UTC instants; "local" shows them in this computer's time zone
+function tlShift(ms){ return $("#tlZone").value==="utc" ? ms : ms - new Date(ms).getTimezoneOffset()*60000 }
+function tlDate(sh, to){ // sh: shifted ms; to: "d" day, "m" minute, "ms" milliseconds
+  const d = new Date(sh);
+  let s = `${String(d.getUTCFullYear()).padStart(4,"0")}-${p2(d.getUTCMonth()+1)}-${p2(d.getUTCDate())}`;
+  if(to!=="d") s += ` ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
+  if(to==="ms") s += `:${p2(d.getUTCSeconds())}.${String(d.getUTCMilliseconds()).padStart(3,"0")}`;
+  return s;
+}
+const TL_W = {m1:1, m5:5, m15:15, h:60, d:1440};
+// columns {h: header, v: sort value, f: cell html, n: numeric, c: CSV header, x: CSV value} and rows of the current view
+function tlModel(){
+  const d = TL.data, h = d.has, MN = MNAME(), g = $("#tlGroup").value;
+  const byTime = (a,b)=> (a.ts===null)-(b.ts===null) || (a.ts-b.ts) || (a.i-b.i);
+  if(g==="exec"){
+    const rows = d.rows.slice().sort(byTime).map((r,k)=> Object.assign({n:k+1}, r));
+    const cols = [
+      {h:"#", n:1, v:r=>r.n, f:r=>fN(r.n), c:"exec_no", x:r=>r.n},
+      {h:t("tl.when"), v:r=>r.ts===null?Infinity:r.ts, f:r=>r.ts===null?`<span class="hint">${esc(t("tl.noTime"))}</span>`:esc(tlDate(tlShift(r.ts),"ms")), c:"timestamp", x:r=>r.ts===null?"":tlDate(tlShift(r.ts),"ms")}];
+    for(let m=0;m<6;m++) if(h[m]) cols.push({h:MN[m], n:1, v:r=>r.m[m], f:r=>fM(m,r.m[m]), c:MCSV[m], x:r=>r.m[m]});
+    cols.push({h:"", v:r=>r.n, f:r=>`<button class="btn sm" data-sample="${r.i}">${esc(t("sample.btnSm"))}</button>`});
+    return {cols, rows};
+  }
+  // groups
+  const dowName = k=> new Date(Date.UTC(2026,10,16+k)).toLocaleDateString(LANG,{weekday:"long", timeZone:"UTC"});
+  const keyOf = sh=> g==="hod" ? new Date(sh).getUTCHours() : g==="dow" ? (new Date(sh).getUTCDay()+6)%7 : Math.floor(sh/(TL_W[g]*60000))*TL_W[g]*60000;
+  const label = k=> k===null ? t("tl.noTime") : g==="hod" ? `${p2(k)}:00–${p2(k)}:59` : g==="dow" ? dowName(k) : tlDate(k, g==="d"?"d":"m");
+  const map = new Map();
+  for(const r of d.rows){
+    const k = r.ts===null ? null : keyOf(tlShift(r.ts));
+    let a = map.get(k);
+    if(!a){ a = {k, count:0, sum:[0,0,0,0,0,0], max:[0,0,0,0,0,0]}; map.set(k, a) }
+    a.count++;
+    for(let m=0;m<6;m++){ a.sum[m] += r.m[m]; if(r.m[m] > a.max[m]) a.max[m] = r.m[m] }
+  }
+  const rows = [...map.values()].sort((a,b)=> (a.k===null)-(b.k===null) || (a.k-b.k));
+  const top = Math.max(1, ...rows.map(r=>r.count));
+  const cols = [
+    {h:t("tl.period"), v:r=>r.k===null?Infinity:r.k, f:r=>r.k===null?`<span class="hint">${esc(label(r.k))}</span>`:esc(label(r.k)), c:"period", x:r=>label(r.k)},
+    {h:t("col.execs"), n:1, v:r=>r.count, f:r=>`<span class="tlBar"><b style="width:${(r.count/top*100).toFixed(1)}%"></b></span>${fN(r.count)}`, c:"executions", x:r=>r.count}];
+  for(const m of [M.dur,M.cpu,M.reads]) if(h[m]){
+    cols.push({h:t("col.mAvg",MN[m]), n:1, v:r=>r.sum[m]/r.count, f:r=>fM(m,r.sum[m]/r.count), c:"avg_"+MCSV[m], x:r=>(r.sum[m]/r.count).toFixed(1)});
+    if(m===M.dur) cols.push({h:t("tl.mMax",MN[m]), n:1, v:r=>r.max[m], f:r=>fM(m,r.max[m]), c:"max_"+MCSV[m], x:r=>r.max[m]});
+    cols.push({h:t("tl.mTot",MN[m]), n:1, v:r=>r.sum[m], f:r=>fM(m,r.sum[m]), c:"total_"+MCSV[m], x:r=>r.sum[m]});
+  }
+  return {cols, rows};
+}
+function tlSorted(md){
+  if(!TL.sort || !md.cols[TL.sort.c]) return md.rows;
+  const c = md.cols[TL.sort.c], dir = TL.sort.desc ? -1 : 1;
+  return md.rows.slice().sort((a,b)=>{ const x=c.v(a), y=c.v(b); return (x<y?-1:x>y?1:0)*dir });
+}
+function tlRender(){
+  const d = TL.data; if(!d) return;
+  $("#tlZoneLocal").textContent = t("tl.local", tlOffsetLabel());
+  const grp = $("#tlGroup");
+  if(!d.withTs){ grp.value = "exec"; grp.disabled = true } else grp.disabled = false;
+  const md = tlModel(), rows = tlSorted(md);
+  let info;
+  if(d.withTs){
+    let lo = Infinity, hi = -Infinity;
+    for(const r of d.rows) if(r.ts!==null){ if(r.ts<lo) lo=r.ts; if(r.ts>hi) hi=r.ts }
+    info = t("tl.info", fN(d.rows.length), tlDate(tlShift(lo),"ms"), tlDate(tlShift(hi),"ms"));
+    if(d.withTs < d.rows.length) info += " " + t("tl.noTs", fN(d.rows.length - d.withTs));
+    if(grp.value!=="exec") info += " " + t("tl.groups", fN(rows.length));
+  } else info = t("tl.noTsAll");
+  if(rows.length > TL_MAX) info += " " + t("tl.cut", fN(TL_MAX), fN(rows.length));
+  $("#tlInfo").textContent = info;
+  const arrow = k=> TL.sort && TL.sort.c===k ? (TL.sort.desc?" ▼":" ▲") : "";
+  $("#tlTab").innerHTML = `<table><tr>${md.cols.map((c,k)=>`<th${c.n?' class="n"':""}${c.h?` data-c="${k}" style="cursor:pointer"`:""}>${esc(c.h)}${arrow(k)}</th>`).join("")}</tr>`
+    + rows.slice(0, TL_MAX).map(r=>`<tr>${md.cols.map(c=>`<td${c.n?' class="n"':""}>${c.f(r)}</td>`).join("")}</tr>`).join("") + `</table>`;
+}
+async function openTl(){
+  const id = curFam;
+  TL.fam = id; TL.data = null; TL.sort = null;
+  $("#tlZoneLocal").textContent = t("tl.local", tlOffsetLabel());
+  $("#tlInfo").textContent = t("loading"); $("#tlTab").innerHTML = "";
+  $("#tlOv").classList.remove("hidden");
+  try{ const d = await api("/api/timeline?id="+id); if(TL.fam===id){ TL.data = d; tlRender() } }
+  catch(e){ $("#tlInfo").textContent = e.message }
+}
+$("#btnCloseTl").onclick = ()=> $("#tlOv").classList.add("hidden");
+$("#tlGroup").addEventListener("change", ()=>{ TL.sort = null; tlRender() });
+$("#tlZone").addEventListener("change", tlRender);
+$("#tlTab").addEventListener("click", e=>{
+  const s = e.target.closest("[data-sample]");
+  if(s){ openSample(+s.dataset.sample); return }
+  const th = e.target.closest("th[data-c]"); if(!th) return;
+  const k = +th.dataset.c, c = tlModel().cols[k];
+  TL.sort = TL.sort && TL.sort.c===k ? {c:k, desc:!TL.sort.desc} : {c:k, desc:!!c.n};
+  tlRender();
+});
+$("#btnTlCsv").onclick = ()=>{
+  if(!TL.data) return;
+  const md = tlModel(), cols = md.cols.filter(c=>c.c), q = v=> '"'+String(v).replace(/"/g,'""')+'"';
+  const lines = [cols.map(c=>q(c.c)).join(";")].concat(tlSorted(md).map(r=> cols.map(c=>q(c.x(r))).join(";")));
+  download(`executions-${$("#tlGroup").value}.csv`, String.fromCharCode(0xFEFF)+lines.join("\r\n"), "text/csv");
+};
+
 /* ---------- sample ---------- */
 let sampleData = null;
 async function openSample(ix){
@@ -1172,7 +1327,11 @@ async function copyText(btn, el){
   btn.textContent = t("copied"); setTimeout(()=> btn.textContent = t("copy"), 1200);
 }
 $("#btnCopy").onclick = ()=> copyText($("#btnCopy"), $("#sampleTxt"));
-document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ $("#sampleOv").classList.add("hidden"); $("#pxOv").classList.add("hidden") } });
+document.addEventListener("keydown", e=>{ if(e.key!=="Escape") return;
+  // the sample can be open over the executions: close the top one only
+  if(!$("#sampleOv").classList.contains("hidden")){ $("#sampleOv").classList.add("hidden"); return }
+  $("#pxOv").classList.add("hidden"); $("#tlOv").classList.add("hidden");
+});
 
 /* ---------- export the parameters of a query: script, CSV or straight into a table ---------- */
 const PX_METRIC = ["duration_us","cpu_us","logical_reads","physical_reads","writes","row_count"];
@@ -1403,6 +1562,7 @@ async function pxLoadCols(){
 $("#pxMode").addEventListener("change", pxLoadCols);
 $("#pxCols").addEventListener("change", e=>{ const k = e.target.dataset.px; if(k){ (PX.sel = PX.sel || {})[k] = e.target.checked; pxRender() } });
 seg("#segPx", pxRender);
+$("#tFamily").addEventListener("click", e=>{ if(e.target.closest("#btnTl")) openTl() });
 $("#tFamily").addEventListener("click", e=>{ if(e.target.closest("#btnPx")) openPx() });
 $("#btnClosePx").onclick = ()=> $("#pxOv").classList.add("hidden");
 $("#pxAuth").addEventListener("change", e=> $("#pxSqlAuth").classList.toggle("hidden", e.target.value!=="sql"));
@@ -1577,6 +1737,7 @@ async function localApi(path, body){
     case "/api/cancel": LJ.cancel = true; return {ok:"1"};
     case "/api/params": return need().paramTable(+q.get("id"), q.get("mode"), refs=> ENGINE.readStatementsAt(LJ.file, LJ.info.encInfo, refs));
     case "/api/dist": return need().distributions();
+    case "/api/timeline": { const r = need().timeline(+q.get("id")); if(!r) throw new Error(tm("query not found")); return r }
     case "/api/overview": { const o = need().overview(); o.fileInfo = fileInfoOut(); return {overview:o, label:LJ.label, state:LJ.state} }
     case "/api/family": { const d = need().detail(+q.get("id")); if(!d) throw new Error(tm("query not found")); return d }
     case "/api/combos": { const c = need().combos(body.id, body.indexes); if(!c) throw new Error(tm("query not found")); return c }

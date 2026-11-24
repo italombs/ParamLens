@@ -83,6 +83,7 @@ function diff(a, b, p, out) {
       const details = {};
       const samples = {};
       const paramTables = {};
+      const timelines = {};
       const blob = new Blob([bytes]);
       const readBatch = refs => PL.readStatementsAt(blob, info.encInfo, refs);
       for (const f of ov.families) {
@@ -92,14 +93,17 @@ function diff(a, b, p, out) {
         const ref = engine.execRef(f.agg.sample);
         const s = await PL.readStatementAt(new Blob([bytes]), info.encInfo, ref.off, ref.len);
         samples[f.agg.sample] = { statement: s, script: PL.testScript(s) };
+        timelines[f.id] = engine.timeline(f.id);
         paramTables[f.id] = { execs: await engine.paramTable(f.id, "execs", readBatch), combos: await engine.paramTable(f.id, "combos", readBatch) };
       }
       const g = canon({ overview: Object.assign({}, golden.overview, { elapsedMs: 0 }), details: golden.details, samples: golden.samples,
-        paramTables: golden.paramTables, distributions: golden.distributions });
-      const j = canon({ overview: Object.assign({}, ov, { elapsedMs: 0 }), details, samples, paramTables, distributions: engine.distributions() });
+        paramTables: golden.paramTables, distributions: golden.distributions, timelines: golden.timelines });
+      const j = canon({ overview: Object.assign({}, ov, { elapsedMs: 0 }), details, samples, paramTables, distributions: engine.distributions(), timelines });
       const out = [];
       diff(g, j, "", out);
       const ign = info.ignored.sp_statement_completed || 0;
+      for (const [s, v] of golden.timestamps || []) { const j = PL.parseTimestamp(s); if (j !== v) out.push(`parseTimestamp(${JSON.stringify(s)}): go=${v} js=${j}`); }
+      if (!golden.timestamps) out.push("timestamps missing from the golden file");
       if (ign !== golden.ignored) out.push(`ignored: expected ${golden.ignored}, js=${ign}`);
       if (!info.header) out.push("header not detected");
       const label = `[${v.name} · ${encName}] ${ov.read} rows, ${ov.families.length} queries, ${ov.findings.length} findings, encoding ${info.encoding}, ${Date.now() - t0} ms`;

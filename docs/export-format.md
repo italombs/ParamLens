@@ -12,7 +12,7 @@ One line per event, 9 TAB-separated columns, in this order:
 | # | Column | Contents |
 |---|---|---|
 | 1 | `event` | event name (`rpc_completed`; other events are skipped and counted) |
-| 2 | `timestamp` | ISO 8601 (`2026-11-20T10:15:00.123`) or empty |
+| 2 | `timestamp` | ISO 8601 (`2026-11-20T10:15:00.123`, optionally with `Z` or an offset such as `-03:00`) or empty; without an offset it is taken as UTC |
 | 3–8 | `duration`, `cpu_time`, `logical_reads`, `physical_reads`, `writes`, `row_count` | integers; empty or `NULL` = missing |
 | 9 | `statement` | escaped: `\` → `\\`, CR → `\r`, LF → `\n`, TAB → `\t` |
 

@@ -17,7 +17,7 @@ func TestWriteDemoTSV(t *testing.T) {
 	}
 	for i, l := range lines[1:] {
 		f := strings.Split(l, "\t")
-		if len(f) != 9 || f[0] != "rpc_completed" || !strings.HasPrefix(f[1], "2026-11-20T1") {
+		if len(f) != 9 || f[0] != "rpc_completed" || !strings.HasPrefix(f[1], "2026-11-") {
 			t.Fatalf("line %d: %q", i+2, l)
 		}
 		if strings.ContainsAny(f[8], "\r\n") || !strings.HasPrefix(f[8], "exec ") {

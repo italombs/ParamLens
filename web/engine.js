@@ -895,6 +895,53 @@ function evalPattern(f, p, ex) {
   return r.eq;
 }
 
+// event timestamp -> Unix ms (UTC), or null; an explicit offset is applied, none means UTC (timeline.go)
+function parseTimestamp(s) {
+  s = trimSpace(s == null ? "" : String(s));
+  let p = 0;
+  const isD = c => c >= "0" && c <= "9";
+  const num = n => {
+    if (p + n > s.length) return null;
+    let v = 0;
+    for (let k = 0; k < n; k++) { const c = s[p + k]; if (!isD(c)) return null; v = v * 10 + (c.charCodeAt(0) - 48); }
+    p += n;
+    return v;
+  };
+  const lit = set => { if (p < s.length && set.includes(s[p])) { p++; return true; } return false; };
+  let y = num(4); if (y === null || !lit("-")) return null;
+  const mo = num(2); if (mo === null || !lit("-")) return null;
+  const d = num(2); if (d === null || !lit("T ")) return null;
+  const h = num(2); if (h === null || !lit(":")) return null;
+  const mi = num(2); if (mi === null) return null;
+  let sec = 0, ms = 0;
+  if (lit(":")) {
+    sec = num(2); if (sec === null) return null;
+    if (lit(".,")) {
+      let k = 0;
+      while (p < s.length && isD(s[p])) { if (k < 3) ms = ms * 10 + (s.charCodeAt(p) - 48); k++; p++; }
+      if (k === 0) return null;
+      for (; k < 3; k++) ms *= 10;
+    }
+  }
+  while (p < s.length && s[p] === " ") p++;
+  let off = 0;
+  if (lit("Zz")) { /* UTC */ } else if (p < s.length && (s[p] === "+" || s[p] === "-")) {
+    const sign = s[p] === "-" ? -1 : 1;
+    p++;
+    const oh = num(2); if (oh === null) return null;
+    lit(":");
+    const om = num(2); if (om === null || oh > 14 || om > 59) return null;
+    off = sign * (oh * 60 + om);
+  }
+  if (p !== s.length || y < 1 || mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59 || sec > 59) return null;
+  if (mo <= 2) y--;
+  const era = Math.floor(y / 400), yoe = y - era * 400, mp = (mo + 9) % 12;
+  const doy = Math.floor((153 * mp + 2) / 5) + d - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  const days = era * 146097 + doe - 719468;
+  return (((days * 24 + h) * 60 + mi - off) * 60 + sec) * 1000 + ms;
+}
+
 class Engine {
   constructor(opts) {
     this.opts = { normalizeLiterals: !!(opts && opts.normalizeLiterals), unitMs: !!(opts && opts.unitMs) };
@@ -925,9 +972,11 @@ class Engine {
     this.fail(kind, trimSpace(stmt || ""));
   }
 
-  // m: 6 números (µs, ou ms se unitMs); has: 6 booleanos; off/len: posição da linha no arquivo
-  ingest(stmtRaw, m, has, off, len) {
+  // m: 6 números (µs, ou ms se unitMs); has: 6 booleanos; off/len: posição da linha no arquivo;
+  // ts: timestamp as captured (parseTimestamp)
+  ingest(stmtRaw, m, has, off, len, ts) {
     this.read++;
+    const tms = parseTimestamp(ts);
     m = m.slice();
     if (this.opts.unitMs) { m[M.DUR] *= 1000; m[M.CPU] *= 1000; }
     for (let k = 0; k < NM; k++) if (has[k]) this.has[k] = true;
@@ -977,11 +1026,24 @@ class Engine {
     const vals = new Int32Array(fam.params.length).fill(-1);
     for (let k = 0; k < pairs.length; k += 2) vals[pairs[k]] = pairs[k + 1];
     fam.execs.push(this.execs.length);
-    this.execs.push({ fam: fam.id, vals, m, off: off || 0, len: len || 0 });
+    this.execs.push({ fam: fam.id, vals, m, off: off || 0, len: len || 0, ts: tms });
     this.parsed++;
   }
 
   finish() { this.ended = Date.now(); }
+
+  // executions of a query in capture order, with timestamp and metrics (timeline.go)
+  timeline(id) {
+    const f = this.fams[id];
+    if (!f) return null;
+    const tl = { family: f.id, has: this.has.slice(), withTs: 0, rows: [] };
+    for (const ix of f.execs) {
+      const e = this.execs[ix];
+      if (e.ts !== null) tl.withTs++;
+      tl.rows.push({ i: ix, ts: e.ts, m: e.m.slice() });
+    }
+    return tl;
+  }
 
   execRef(ix) {
     const e = this.execs[ix];
@@ -1806,7 +1868,7 @@ async function analyzeFile(blob, opts) {
       const v = metrics[k] == null ? null : parseMetric(metrics[k]);
       if (v !== null) { m[k] = v; has[k] = true; }
     }
-    eng.ingest(stmt, m, has, off, len);
+    eng.ingest(stmt, m, has, off, len, ts);
   };
   const blank = line => line === "" || (line.length < 3 && trimSpace(line) === "");
   let first = true;
@@ -1890,7 +1952,7 @@ function decodeStatement(b, encInfo) {
 
 return {
   Engine, analyzeFile, readStatementAt, readStatementsAt, testScript, parseRPC, normalizeSQL, detectPatterns, tokenize,
-  sqlEqual, unescapeStmt, splitExportLine, parseDelimited, detectFormat, detectEncoding, likeToRegExp, EXPORT_COLS,
+  sqlEqual, unescapeStmt, splitExportLine, parseDelimited, detectFormat, detectEncoding, likeToRegExp, EXPORT_COLS, parseTimestamp,
   _internal: { utf8Len, utf8Prefix, cmpStr, clipValue, classOf, normDate, parseNum },
 };
 });

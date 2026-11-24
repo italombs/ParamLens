@@ -24,6 +24,16 @@ async function analyzeFile(page, tsv) {
 async function checkResults(page, label, { samples }) {
   const fams = await page.$$eval("#famList .fam", els => els.length);
   check(fams === 18, `${label}: 18 queries in the list (${fams})`);
+  const sorts = await page.$$eval("#famSort option", os => os.map(o => o.value));
+  check(sorts[0] === "sum:2" && sorts.includes("avg:1") && sorts.includes("avg:0") && sorts.includes("sev"), `${label}: sort options per metric (${sorts.join(" ")})`);
+  await page.selectOption("#famSort", "avg:2");
+  const byAvg = await page.evaluate(() => {
+    const ids = [...document.querySelectorAll("#famList .fam")].map(e => +e.dataset.id);
+    const a = id => { const f = ov.families.find(x => x.id === id); return f.agg.sum[2] / f.agg.count };
+    return ids.every((id, i) => i === 0 || a(ids[i - 1]) >= a(id)) && /avg logical reads/.test(document.querySelector("#famList .fam .m").textContent);
+  });
+  check(byAvg, `${label}: sorted by average logical reads`);
+  await page.selectOption("#famSort", "sum:2");
   const kpi = await page.textContent("#totKpis");
   check(/Executions/.test(kpi) && /Findings/.test(kpi), `${label}: KPIs in English`);
   const nFind = await page.$$eval("#tFindings .find", els => els.length);
@@ -103,6 +113,38 @@ async function checkHardCoded(page, label) {
   await page.click('#pxCols input[data-px="p:0"]');
   check(!(await page.isDisabled("#pxReplay")), `${label}: replay enabled again`);
   await page.click("#btnClosePx");
+}
+
+// executions of the selected query over time: one row each, grouped per hour / hour of the day, CSV
+async function checkTimeline(page, label) {
+  await page.click("#famList .fam");
+  await page.waitForSelector("#tFamily:not(.hidden) #btnTl");
+  const execs = await page.evaluate(() => curDetail.summary.agg.count);
+  await page.click("#btnTl");
+  await page.waitForSelector("#tlTab table");
+  const num = s => +s.replace(/[^\d]/g, "");
+  const n = await page.$$eval("#tlTab tr", trs => trs.length - 1);
+  check(n === Math.min(execs, 2000) && /executions from \d{4}-\d\d-\d\d/.test(await page.textContent("#tlInfo")), `${label}: executions listed one per row (${n} of ${execs})`);
+  const ts = await page.$$eval("#tlTab tr td:nth-child(2)", tds => tds.map(td => td.textContent));
+  check(ts.every((x, i) => i === 0 || ts[i - 1] <= x) && /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3}$/.test(ts[0]), `${label}: in time order (${ts[0]})`);
+  for (const [g, max] of [["h", Infinity], ["hod", 24], ["dow", 7]]) {
+    await page.selectOption("#tlGroup", g);
+    const cnt = await page.$$eval("#tlTab tr td:nth-child(2)", tds => tds.map(td => td.textContent));
+    const sum = cnt.reduce((a, x) => a + num(x), 0);
+    check(sum === execs && cnt.length >= 1 && cnt.length <= max, `${label}: grouped by ${g}, ${cnt.length} period(s), ${sum} executions`);
+  }
+  await page.click("#tlTab th[data-c='1']"); // executions, highest first
+  const desc = (await page.$$eval("#tlTab tr td:nth-child(2)", tds => tds.map(td => td.textContent))).map(num);
+  check(desc.every((x, i) => i === 0 || desc[i - 1] >= x), `${label}: sorted by a column`);
+  const csv = await download(page, "#btnTlCsv");
+  check(/^"period";"executions";"avg_duration_us"/.test(csv.text), `${label}: CSV of the groups (${csv.name})`);
+  await page.selectOption("#tlGroup", "exec");
+  await page.click("#tlTab [data-sample]");
+  await page.waitForFunction(() => /exec/i.test(document.querySelector("#sampleTxt").textContent) && !/loading/.test(document.querySelector("#sampleTxt").textContent));
+  await page.keyboard.press("Escape");
+  check(await page.isHidden("#sampleOv") && await page.isVisible("#tlOv"), `${label}: the sample of one execution opens over the list`);
+  await page.keyboard.press("Escape");
+  check(await page.isHidden("#tlOv"), `${label}: Escape closes the list`);
 }
 
 // baseline × current analysis, saved and loaded back
@@ -196,6 +238,7 @@ async function noHorizontalScroll(page, label) {
   await noHorizontalScroll(page, "html");
   await checkParamExport(page, "html", { db: false });
   await checkHardCoded(page, "html");
+  await checkTimeline(page, "html");
   await checkCompare(page, "html");
   await checkCompareOther(page, "html", () => analyzeFile(page, tsvPath));
   await page.click("#mainTabs button[data-v=fails]");
@@ -294,6 +337,7 @@ async function noHorizontalScroll(page, label) {
     await p3.click("#btnCloseSample");
     await checkParamExport(p3, "exe", { db: true });
     await checkHardCoded(p3, "exe");
+    await checkTimeline(p3, "exe");
     await checkCompare(p3, "exe");
     await checkCompareOther(p3, "exe", () => p3.click("#btnDemo"));
     await p3.selectOption("#langSel", "pt-BR");

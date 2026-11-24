@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf16"
 
 	"github.com/italombs/ParamLens/internal/engine"
@@ -91,6 +92,22 @@ func parityExtraRows() []engine.Row {
 	return rows
 }
 
+// timestamp formats read by ParseTimestamp × parseTimestamp (value null when not readable)
+func parityTimestamps() [][2]any {
+	ins := []string{"2026-11-20T13:10:00.123Z", "2026-11-20 10:10:00.1234567 -03:00", "2026-11-20 13:10:00.1234567", "  2026-11-20T13:10:00.5+0530 ",
+		"2026-11-20 13:10", "2024-02-29T23:59:59,9", "1900-01-01 00:00:00.000", "0001-01-01T00:00:00", "9999-12-31T23:59:59.999-14:00",
+		"", "NULL", "2026-11-20", "2026-13-20 10:00", "2026-11-20 24:00", "2026-11-20 10:00:00.", "2026-11-20 10:00:00 AM", "20/11/2026 10:00",
+		"２026-11-20 10:00", "2026-11-20 10:00 +15:00"}
+	out := make([][2]any, len(ins))
+	for i, s := range ins {
+		out[i][0] = s
+		if v, ok := engine.ParseTimestamp(s); ok {
+			out[i][1] = v
+		}
+	}
+	return out
+}
+
 func TestParityFixtures(t *testing.T) {
 	dir := os.Getenv("PARAMLENS_PARITY_DIR")
 	if dir == "" {
@@ -109,6 +126,23 @@ func TestParityFixtures(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// timestamps: the same instant written as .xel/bcp (TSV, UTC) and as a datetimeoffset in UTC-3 (CSV);
+	// one row without a timestamp and one with NULL
+	t0 := time.Date(2026, 11, 20, 13, 0, 0, 0, time.UTC)
+	brt := time.FixedZone("", -3*3600)
+	csvTS := make([]string, len(rows))
+	for i := range rows {
+		tm := t0.Add(time.Duration(i)*1237*time.Millisecond + time.Duration(i%7)*time.Hour)
+		rows[i].TS = tm.Format("2006-01-02T15:04:05.000")
+		csvTS[i] = tm.In(brt).Format("2006-01-02 15:04:05.0000000 -07:00")
+		switch i {
+		case 3:
+			rows[i].TS, csvTS[i] = "", ""
+		case 5:
+			rows[i].TS, csvTS[i] = "NULL", "NULL"
+		}
+	}
+
 	// export.tsv: cabeçalho, eventos de outro tipo intercalados, NULL vindo do SSMS
 	var sb strings.Builder
 	sb.WriteString("event\ttimestamp\tduration\tcpu_time\tlogical_reads\tphysical_reads\twrites\trow_count\tstatement\r\n")
@@ -118,7 +152,7 @@ func TestParityFixtures(t *testing.T) {
 			sb.WriteString("sp_statement_completed\t2026-11-20T10:00:00.000\t1\t1\t1\t0\t0\t0\tSELECT x FROM t WHERE a = @p\r\n")
 			ignored++
 		}
-		sb.WriteString("rpc_completed\t2026-11-20T10:" + strconv.Itoa(10+i%50) + ":00.000")
+		sb.WriteString("rpc_completed\t" + r.TS)
 		for k := 0; k < engine.NMetrics; k++ {
 			sb.WriteByte('\t')
 			if r.Has[k] {
@@ -158,8 +192,7 @@ func TestParityFixtures(t *testing.T) {
 				met[k] = "NULL"
 			}
 		}
-		ts := "2026-11-20 10:" + strconv.Itoa(10+i%50) + ":00.0000000 +00:00"
-		cw.Write([]string{"rpc_completed", ts, ts, "NULL", met[engine.MDur], met[engine.MCpu], met[engine.MPhys], met[engine.MReads], met[engine.MWrites], met[engine.MRows], r.Stmt, "", "\x00", strconv.Itoa(i)})
+		cw.Write([]string{"rpc_completed", "", csvTS[i], "NULL", met[engine.MDur], met[engine.MCpu], met[engine.MPhys], met[engine.MReads], met[engine.MWrites], met[engine.MRows], r.Stmt, "", "\x00", strconv.Itoa(i)})
 	}
 	cw.Flush()
 	if err := os.WriteFile(filepath.Join(dir, "export.csv"), cb.Bytes(), 0o644); err != nil {
@@ -185,6 +218,7 @@ func TestParityFixtures(t *testing.T) {
 		details := map[int]*engine.FamilyDetail{}
 		samples := map[int]map[string]string{}
 		paramTables := map[int]map[string]*engine.ParamTable{}
+		timelines := map[int]*engine.Timeline{}
 		for _, f := range ov.Families {
 			d, _ := eng.Detail(f.ID)
 			details[f.ID] = d
@@ -202,6 +236,9 @@ func TestParityFixtures(t *testing.T) {
 			d2 := *d
 			d2.Combos = c
 			details[f.ID] = &d2
+			if timelines[f.ID], err = eng.Timeline(f.ID); err != nil {
+				t.Fatal(err)
+			}
 			paramTables[f.ID] = map[string]*engine.ParamTable{}
 			for _, mode := range []string{"execs", "combos"} {
 				pt, err := eng.ParamTable(f.ID, mode)
@@ -213,7 +250,7 @@ func TestParityFixtures(t *testing.T) {
 		}
 		data, err := json.Marshal(map[string]any{
 			"overview": ov, "details": details, "samples": samples, "ignored": ignored,
-			"paramTables": paramTables, "distributions": eng.Distributions(),
+			"paramTables": paramTables, "distributions": eng.Distributions(), "timelines": timelines, "timestamps": parityTimestamps(),
 		})
 		eng.Close()
 		if err != nil {

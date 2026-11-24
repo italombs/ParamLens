@@ -33,6 +33,7 @@ type Row struct {
 	Stmt string
 	M    Metrics
 	Has  [NMetrics]bool
+	TS   string // event timestamp as captured (see ParseTimestamp); empty when unknown
 }
 
 const (
@@ -117,6 +118,7 @@ type Exec struct {
 	M    Metrics
 	Off  int64
 	Len  int32
+	TS   int64 // Unix ms (UTC), noTS when unknown
 }
 
 type ParseFail struct {
@@ -218,6 +220,10 @@ func (e *Engine) Ingest(r Row) {
 			e.has[k] = true
 		}
 	}
+	ts, ok := ParseTimestamp(r.TS)
+	if !ok {
+		ts = noTS
+	}
 	stmt := strings.TrimSpace(r.Stmt)
 	if stmt == "" {
 		e.fail("empty statement", "")
@@ -307,7 +313,7 @@ func (e *Engine) Ingest(r Row) {
 	e.tOff += int64(n)
 
 	fam.Execs = append(fam.Execs, int32(len(e.execs)))
-	e.execs = append(e.execs, Exec{Fam: int32(fam.ID), Vals: vals, M: r.M, Off: off, Len: int32(n)})
+	e.execs = append(e.execs, Exec{Fam: int32(fam.ID), Vals: vals, M: r.M, Off: off, Len: int32(n), TS: ts})
 	e.Parsed.Add(1)
 }
 

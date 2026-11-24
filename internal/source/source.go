@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"math/rand"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	_ "github.com/microsoft/go-mssqldb"
 
@@ -215,7 +217,7 @@ type SourceReq struct {
 	DB         string            `json:"db"`
 	Schema     string            `json:"schema"`
 	Table      string            `json:"table"`
-	Cols       map[string]string `json:"cols"` // stmt, name, duration, cpu, reads, physical, writes, rows
+	Cols       map[string]string `json:"cols"` // stmt, name, ts, duration, cpu, reads, physical, writes, rows
 	EventValue string            `json:"eventValue"`
 	Like       string            `json:"like"`
 	Where      string            `json:"where"`
@@ -246,6 +248,11 @@ func BuildQuery(s SourceReq) (string, []any, error) {
 				sel = append(sel, "CAST(NULL AS bigint)")
 			}
 		}
+		if c := s.Cols["ts"]; c != "" {
+			sel = append(sel, "CONVERT(nvarchar(40), "+qn(c)+", 121)")
+		} else {
+			sel = append(sel, "CAST(NULL AS nvarchar(40))")
+		}
 		q := "SELECT " + top + strings.Join(sel, ", ") + "\nFROM " + qn(s.DB) + "." + qn(s.Schema) + "." + qn(s.Table) + "\nWHERE " + qn(stmt) + " IS NOT NULL"
 		if c := s.Cols["name"]; c != "" && strings.TrimSpace(s.EventValue) != "" {
 			q += "\n  AND " + qn(c) + " = @ev"
@@ -272,7 +279,7 @@ func BuildQuery(s SourceReq) (string, []any, error) {
 		val := func(name, typ string) string {
 			return `x.e.value('(event/data[@name="` + name + `"]/value)[1]', '` + typ + `')`
 		}
-		q := `SELECT ` + top + `v.statement, v.duration, v.cpu_time, v.logical_reads, v.physical_reads, v.writes, v.row_count
+		q := `SELECT ` + top + `v.statement, v.duration, v.cpu_time, v.logical_reads, v.physical_reads, v.writes, v.row_count, v.ts
 FROM (
   SELECT ` + val("statement", "nvarchar(max)") + ` AS statement,
          ` + val("duration", "bigint") + ` AS duration,
@@ -280,7 +287,8 @@ FROM (
          ` + val("logical_reads", "bigint") + ` AS logical_reads,
          ` + val("physical_reads", "bigint") + ` AS physical_reads,
          ` + val("writes", "bigint") + ` AS writes,
-         ` + val("row_count", "bigint") + ` AS row_count
+         ` + val("row_count", "bigint") + ` AS row_count,
+         x.e.value('(event/@timestamp)[1]', 'nvarchar(40)') AS ts
   FROM (SELECT CAST(event_data AS xml) AS e
         FROM sys.fn_xe_file_target_read_file(@path, NULL, NULL, NULL)
         WHERE object_name = @ev) AS x
@@ -314,15 +322,17 @@ func RunSQL(ctx context.Context, c ConnReq, s SourceReq, emit func(engine.Row)) 
 	defer rows.Close()
 	var stmt sql.NullString
 	var m [engine.NMetrics]sql.NullInt64
+	var ts sql.NullString
 	dst := []any{&stmt}
 	for k := range m {
 		dst = append(dst, &m[k])
 	}
+	dst = append(dst, &ts)
 	for rows.Next() {
 		if err := rows.Scan(dst...); err != nil {
 			return err
 		}
-		r := engine.Row{Stmt: stmt.String}
+		r := engine.Row{Stmt: stmt.String, TS: ts.String}
 		for k := range m {
 			if m[k].Valid {
 				r.M[k] = m[k].Int64
@@ -363,6 +373,7 @@ WHERE [ENINVOICE].[OWNERTYPEID] = @qpinOwnerTypeIdCustomer AND [ENINVOICE].[CUST
  AND (@qpboAllProjects = 1 OR [ENINVOICE].[PROJECTID] = @qploProjectId)
  AND [ENINVOICE].[PRIORITY] IN (@qpinPriority_Normal, @qpinPriority_High)
 ORDER BY [ENINVOICE].[CREATEDON] DESC`
+	times := demoTimes(n)
 	for i := 0; i < n; i++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -434,7 +445,37 @@ ORDER BY [ENINVOICE].[CREATEDON] DESC`
 		for k := range r.Has {
 			r.Has[k] = true
 		}
+		r.TS = times[i]
 		emit(r)
 	}
 	return nil
+}
+
+// demoTimes spreads n timestamps over three working days, busier in the morning and afternoon, in
+// increasing order (a separate generator, so the rest of the sample data does not change).
+func demoTimes(n int) []string {
+	rnd := rand.New(rand.NewSource(7))
+	// per UTC hour: working hours of UTC-3 (09:00-18:00 there)
+	weights := []int{3, 2, 2, 1, 1, 1, 1, 1, 1, 2, 4, 9, 14, 15, 12, 6, 8, 13, 14, 11, 7, 4, 3, 2}
+	total := 0
+	for _, w := range weights {
+		total += w
+	}
+	t0 := time.Date(2026, 11, 18, 3, 0, 0, 0, time.UTC) // midnight in UTC-3
+	ts := make([]time.Time, n)
+	for i := range ts {
+		h, x := 0, rnd.Intn(total)
+		for x >= weights[h] {
+			x -= weights[h]
+			h++
+		}
+		h = (h + 21) % 24 // hours after t0
+		ts[i] = t0.Add(time.Duration(rnd.Intn(3))*24*time.Hour + time.Duration(h)*time.Hour + time.Duration(rnd.Int63n(int64(time.Hour/time.Millisecond)))*time.Millisecond)
+	}
+	sort.Slice(ts, func(i, j int) bool { return ts[i].Before(ts[j]) })
+	out := make([]string, n)
+	for i, t := range ts {
+		out[i] = t.Format("2006-01-02T15:04:05.000")
+	}
+	return out
 }

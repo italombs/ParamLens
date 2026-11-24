@@ -61,6 +61,8 @@ More in the [user guide](docs/user-guide.md).
   combination) as a SQL script with an optional replay loop for Query Store, as CSV, or inserted straight
   into a table of your choice. Hard-coded values of the SQL go too: inline `IN` lists as comma-separated
   text for `STRING_SPLIT`, and literals compared with a column.
+- **Executions over time:** every call of a query with its date and time, or grouped per minute, hour, day,
+  hour of the day or day of the week, to see when it runs and when it gets slow.
 - **Before × after comparison:** pick the original query and the rewrite, in the same capture or in two
   captures (another table, `.xel` or file), and get the change in average, p50, p95, p99 and max of
   duration, CPU and reads.
