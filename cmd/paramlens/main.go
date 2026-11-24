@@ -4,6 +4,7 @@
 //
 //	paramlens [-port 8765] [-browser] [-no-browser] [-bind 127.0.0.1]
 //	paramlens -write-html ParamLens.html   (writes the standalone offline version and exits)
+//	paramlens -write-demo sample-data.tsv  (writes the sample data as an exported file and exits)
 package main
 
 import (
@@ -13,6 +14,7 @@ import (
 
 	"github.com/italombs/ParamLens/internal/desktop"
 	"github.com/italombs/ParamLens/internal/server"
+	"github.com/italombs/ParamLens/internal/source"
 	"github.com/italombs/ParamLens/web"
 )
 
@@ -25,10 +27,12 @@ func main() {
 	noBrowser := flag.Bool("no-browser", false, "do not open any window: only serve the interface (link printed on the console)")
 	bind := flag.String("bind", "127.0.0.1", "listen address (use 0.0.0.0 only inside a container, publishing the port on 127.0.0.1)")
 	writeHTML := flag.String("write-html", "", "write the standalone (offline) HTML version to this file and exit")
+	writeDemo := flag.String("write-demo", "", "write the synthetic sample data as an exported TSV file to this file and exit")
+	demoRows := flag.Int("demo-rows", 6000, "number of events written by -write-demo")
 	flag.Parse()
 
 	window := !*browser && !*noBrowser && desktop.WindowAvailable()
-	if !window || *writeHTML != "" {
+	if !window || *writeHTML != "" || *writeDemo != "" {
 		desktop.Console()
 	}
 
@@ -38,6 +42,22 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("Written:", *writeHTML)
+		return
+	}
+
+	if *writeDemo != "" {
+		f, err := os.Create(*writeDemo)
+		if err == nil {
+			err = source.WriteDemoTSV(f, *demoRows)
+			if cerr := f.Close(); err == nil {
+				err = cerr
+			}
+		}
+		if err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+		fmt.Println("Written:", *writeDemo)
 		return
 	}
 

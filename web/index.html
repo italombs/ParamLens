@@ -237,6 +237,7 @@ ol.steps li{margin:2px 0}
 <section id="vFile" class="grid2 hidden">
   <div class="card">
     <h2 data-i18n="file.title"></h2>
+    <div class="row hidden" id="fDemo" style="margin:0 0 12px"><button class="btn primary nf" id="btnFileDemo" data-i18n="conn.demo"></button><span class="hint" data-i18n="file.demoHint"></span></div>
     <label class="drop" id="drop">
       <input type="file" id="fFile" accept=".tsv,.txt,.csv,.dat,text/plain" hidden>
       <b data-i18n="file.drop"></b>
@@ -417,7 +418,7 @@ en: {
   "src.normLit":"Group queries that differ only in literals", "src.analyze":"Analyze", "src.preview":"Show query",
   "loading":"loading…", "noTables":"— no tables —", "tblRows":"{0} rows", "none":"(none)",
   "col.ev":"Event name", "col.ts":"Date/time",
-  "file.title":"1. Exported file", "file.drop":"Drop the file here", "file.dropHint":"or click to choose · TSV from the export described beside, or a CSV/TXT with a header row (e.g. SELECT * saved by SSMS)",
+  "file.title":"1. Exported file", "file.demoHint":"Synthetic data, analyzed in your browser: nothing is uploaded.", "file.drop":"Drop the file here", "file.dropHint":"or click to choose · TSV from the export described beside, or a CSV/TXT with a header row (e.g. SELECT * saved by SSMS)",
   "file.event":"Event to analyze", "file.like":"Statement LIKE (optional; %, _ and [..] as in T-SQL)",
   "file.private":"The file is read only in this browser: nothing is sent anywhere.", "file.back":"Back to the SQL Server connection",
   "file.noEngine":"The analysis engine is missing from this page: open the ParamLens.html from the release.",
@@ -512,7 +513,7 @@ en: {
   "src.normLit":"Agrupar queries que só mudam literais", "src.analyze":"Analisar", "src.preview":"Ver query",
   "loading":"carregando…", "noTables":"— nenhuma tabela —", "tblRows":"{0} linhas", "none":"(nenhuma)",
   "col.ev":"Nome do evento", "col.ts":"Data/hora",
-  "file.title":"1. Arquivo exportado", "file.drop":"Arraste o arquivo aqui", "file.dropHint":"ou clique para escolher · TSV da exportação ao lado, ou um CSV/TXT com cabeçalho (ex.: SELECT * salvo pelo SSMS)",
+  "file.title":"1. Arquivo exportado", "file.demoHint":"Dados sintéticos, analisados no seu navegador: nada é enviado.", "file.drop":"Arraste o arquivo aqui", "file.dropHint":"ou clique para escolher · TSV da exportação ao lado, ou um CSV/TXT com cabeçalho (ex.: SELECT * salvo pelo SSMS)",
   "file.event":"Evento analisado", "file.like":"Statement LIKE (opcional; %, _ e [..] como no T-SQL)",
   "file.private":"O arquivo é lido só neste navegador: nada é enviado para lugar nenhum.", "file.back":"Voltar para a conexão com o SQL Server",
   "file.noEngine":"Motor de análise ausente nesta página: abra o ParamLens.html da release.",
@@ -1600,6 +1601,29 @@ $("#vFile").addEventListener("click", e=>{
   const b = e.target.closest("[data-copy]"); if(b) copyText(b, $("#"+b.dataset.copy));
 });
 
+/* ---------- online demo ---------- */
+// When the page is served next to sample-data.tsv (GitHub Pages), "Load sample data" analyzes that file,
+// and ?demo=1 does it on load. Opened from disk, or without the file, nothing changes.
+const DEMO_FILE = "sample-data.tsv";
+async function loadDemoFile(){
+  const msg = $("#fMsg");
+  try{
+    const r = await fetch(DEMO_FILE, {cache:"no-cache"});
+    if(!r.ok) throw new Error(r.status + " " + r.statusText);
+    setFile(new File([await r.blob()], DEMO_FILE, {type:"text/plain"}));
+    $("#btnFileAnalyze").click();
+  }catch(e){ msg.className = "err"; msg.textContent = e.message }
+}
+function initDemoFile(){
+  if(!/^https?:$/.test(location.protocol)) return;
+  fetch(DEMO_FILE, {method:"HEAD", cache:"no-cache"}).then(r=>{
+    if(!r.ok) return;
+    $("#fDemo").classList.remove("hidden");
+    if(new URLSearchParams(location.search).has("demo")) loadDemoFile();
+  }).catch(()=>{});
+}
+$("#btnFileDemo").onclick = loadDemoFile;
+
 /* ---------- start ---------- */
 applyLang();
 if(APP) $("#btnQuit").classList.add("hidden");
@@ -1612,6 +1636,7 @@ if(STATIC){
 }else if(LOCAL){
   $("#btnQuit").classList.add("hidden");
   showSetup();
+  initDemoFile();
 }else{
   api("/api/status").then(st=>{ if(st.state==="done"||st.state==="canceled") loadResults(); else if(st.state==="running"){ $("#progOv").classList.remove("hidden"); poll() } }).catch(()=>{});
 }

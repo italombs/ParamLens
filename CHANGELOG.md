@@ -6,6 +6,11 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 
 ## [Unreleased]
 
+### Added
+- Online demo: `ParamLens.html` on GitHub Pages with synthetic sample data
+  (<https://italombs.github.io/ParamLens/?demo=1>), analyzed in the browser.
+- `-write-demo <file>` writes the sample data as an exported TSV file.
+
 ### Changed
 - README and feature tour: new usage GIF and screenshots of the parameter export and of the before × after
   comparison, and a "from diagnosis to a measured fix" walkthrough.

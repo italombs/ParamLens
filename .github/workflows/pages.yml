@@ -1,0 +1,48 @@
+name: Online demo
+
+# Publishes ParamLens.html with the synthetic sample data on GitHub Pages:
+# https://italombs.github.io/ParamLens/?demo=1
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'internal/**', 'cmd/**', 'go.mod', 'go.sum', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Page and sample data
+        run: |
+          mkdir -p _site
+          go run ./cmd/paramlens -write-html _site/index.html
+          go run ./cmd/paramlens -write-demo _site/sample-data.tsv
+          grep -q 'id="pl-engine"' _site/index.html
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -157,6 +157,7 @@ async function noHorizontalScroll(page, label) {
   await page.goto("file://" + path.resolve(htmlPath));
   check(await page.isVisible("#vFile"), "html: file screen shows without a server");
   check(!(await page.isVisible("#vSetup")), "html: connection hidden");
+  check(!(await page.isVisible("#fDemo")), "html: no online sample data from disk");
   check((await page.getAttribute("html", "lang")) === "en" && /Drop the file here/.test(await page.textContent("#drop")), "html: English by default");
   const bcp = await page.textContent("#expBcp");
   check(/^bcp "SELECT x\.object_name,/.test(bcp) && /queryout "C:\\temp\\paramlens-events\.tsv" -S SERVER -d master -T -w$/.test(bcp), "html: bcp command for .xel");
@@ -298,6 +299,36 @@ async function noHorizontalScroll(page, label) {
     srv.kill();
   }
 
+
+  // ---------- 4) online demo: the page served over HTTP next to sample-data.tsv ----------
+  if (binPath) {
+    const site = path.resolve("dist/site");
+    fs.mkdirSync(site, { recursive: true });
+    fs.copyFileSync(htmlPath, path.join(site, "index.html"));
+    await new Promise((res, rej) => spawn(binPath, ["-write-demo", path.join(site, "sample-data.tsv"), "-demo-rows", "3000"], { stdio: "ignore" })
+      .on("exit", c => c === 0 ? res() : rej(new Error("-write-demo failed"))));
+    const http = require("http");
+    const web = http.createServer((req, res) => {
+      const f = path.join(site, decodeURIComponent(new URL(req.url, "http://x").pathname).replace(/^\/$/, "/index.html"));
+      if (!f.startsWith(site) || !fs.existsSync(f)) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { "Content-Type": f.endsWith(".html") ? "text/html; charset=utf-8" : "text/plain" });
+      res.end(req.method === "HEAD" ? undefined : fs.readFileSync(f));
+    }).listen(0, "127.0.0.1");
+    await new Promise(r => web.once("listening", r));
+    const base = `http://127.0.0.1:${web.address().port}/`;
+    const p4 = await ctx.newPage();
+    p4.on("pageerror", e => errors.push(e.message));
+    await p4.goto(base);
+    await p4.waitForSelector("#fDemo:not(.hidden)");
+    check(/Load sample data/.test(await p4.textContent("#fDemo")), "demo: sample data offered when served next to the file");
+    await p4.goto(base + "?demo=1&lang=pt-BR");
+    await p4.waitForSelector("#vRes:not(.hidden)", { timeout: 60000 });
+    const n = (await p4.$$("#famList .fam")).length;
+    check(n === 3 && /sample-data\.tsv/.test(await p4.textContent("header")), `demo: ?demo=1 analyzes the sample data (${n} queries)`);
+    check(/Dados sintéticos/.test(await p4.textContent("#fDemo")), "demo: hint in pt-BR");
+    await p4.close();
+    web.close();
+  }
   check(errors.length === 0, "no JavaScript errors" + (errors.length ? ": " + errors.join(" | ") : ""));
   await browser.close();
   if (failures) { console.log(`\n${failures} check(s) failed`); process.exit(1); }

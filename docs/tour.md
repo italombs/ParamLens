@@ -1,7 +1,8 @@
 # Feature tour
 
 All screenshots use the built-in **sample data** (synthetic, OutSystems-style queries over a fictitious
-orders/customers/invoices schema). Try it yourself: run `ParamLens.exe` and click **Load sample data**.
+orders/customers/invoices schema). Try it yourself: [open the online demo](https://italombs.github.io/ParamLens/?demo=1), or run
+`ParamLens.exe` and click **Load sample data**.
 
 ![Usage: load the sample data, open a query, inspect its parameters, export them and compare the query with its rewrite](images/tour.gif)
 

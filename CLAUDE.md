@@ -36,7 +36,8 @@ orders/customers/invoices domain. Real captures stay in `sample/` (git-ignored).
   `cmd/paramlens/winres/winres.json` (go-winres in the release workflow; the `.syso` is git-ignored).
 - The UI is a single `web/index.html` (vanilla JS, no CDN). `web/web.go` embeds it and injects
   `web/engine.js` at the `<!--ENGINE-->` marker (`web.Page()`, `web.WithStaticData()`). The same assembled page is:
-  the `.exe` UI, the standalone `ParamLens.html` (`-write-html`, built by the release workflow) and the
+  the `.exe` UI, the standalone `ParamLens.html` (`-write-html`, built by the release workflow; also the online demo on
+  GitHub Pages with `sample-data.tsv` from `-write-demo`, `.github/workflows/pages.yml`, `?demo=1` loads it) and the
   exported report (analysis JSON injected at `<!--STATIC-DATA-->`; static mode: no API, fixed combinations,
   no "sample" button).
 - **Two engines, kept identical:** Go (`.exe`, SQL sources) and JS (`web/engine.js`, file mode in the
@@ -61,7 +62,7 @@ orders/customers/invoices domain. Real captures stay in `sample/` (git-ignored).
 | `internal/source/insert.go` | `InsertParams`: CREATE TABLE (types validated by `ValidType`) + parameterized multi-row INSERTs in one transaction, `SET DATEFORMAT ymd` |
 | `internal/desktop/` | WebView2 window, dark title bar, maximize on small screens, console handling, `Fatal` message box |
 | `internal/server/server.go` | `Listen`/`Serve`/`Banner`: server, `/api/*` endpoints (incl. `/api/params`, `/api/dist`, `/api/insert`), analysis jobs in a goroutine, report export |
-| `cmd/paramlens/main.go` | Flags (`-port`, `-browser`, `-no-browser`, `-bind`, `-write-html`), window or browser, `version` set by `-ldflags -X main.version` |
+| `cmd/paramlens/main.go` | Flags (`-port`, `-browser`, `-no-browser`, `-bind`, `-write-html`, `-write-demo`), window or browser, `version` set by `-ldflags -X main.version` |
 | `web/web.go` | `go:embed` of `index.html` + `engine.js`; `TestAssembledPage` checks the markers |
 | `web/engine.js` | JS engine + reader of the exported file (streamed, encoding detection, offsets for samples) |
 | `web/index.html` | UI, i18n dictionaries, file mode (`localApi` mimics the `/api/*` endpoints), export-query builder, parameter export (script/CSV/insert payload built in JS for both engines), Compare tab (baseline snapshot kept in the page, saved as `.json`) |

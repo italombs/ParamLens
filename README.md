@@ -8,6 +8,9 @@ pattern and, above all, *catch-all* predicates (`@p = 0 OR col = @p`) that turn 
 most executions. Built for the usual ORM/low-code problems (OutSystems, Entity Framework, …): optional
 ORs, parameter sniffing, inline `IN` lists and parameter type/size variations.
 
+**[▶ Try it online](https://italombs.github.io/ParamLens/?demo=1)**: the full analysis runs in your browser on
+synthetic sample data. Nothing to install, nothing uploaded.
+
 ![ParamLens in action with the sample data](docs/images/tour.gif)
 
 **[See the feature tour with screenshots →](docs/tour.md)**

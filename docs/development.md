@@ -74,8 +74,8 @@ node scripts/ui-smoke.js dist/ParamLens.html dist/parity/export.tsv dist/paramle
 Run locally: `go run ./cmd/paramlens -port 8765` and use **Load sample data**.
 
 Command-line options: `-port` (fixed port), `-browser` (default browser instead of the app window),
-`-no-browser` (no window at all, only the link on the console), `-bind` (default `127.0.0.1`) and
-`-write-html <file>`.
+`-no-browser` (no window at all, only the link on the console), `-bind` (default `127.0.0.1`),
+`-write-html <file>` and `-write-demo <file>` (the sample data as an exported TSV, `-demo-rows` events).
 
 The release `.exe` is a GUI program (`-H windowsgui`): without a console it opens the WebView2 window and
 quits when the window closes. In browser mode, or when WebView2 is missing, it attaches to the console
@@ -116,3 +116,10 @@ the host, use `host.docker.internal` as the server. The parity and UI checks als
 Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml` on Windows: tests, executable metadata,
 build, standalone HTML, checksums and the GitHub release, whose notes are the version's section of
 `CHANGELOG.md`: add it before tagging.
+
+## Online demo
+
+`.github/workflows/pages.yml` publishes `ParamLens.html` as `index.html` and the sample data written by
+`-write-demo` as `sample-data.tsv` on GitHub Pages (<https://italombs.github.io/ParamLens/?demo=1>) on every
+push to `main` that touches the code. Served over HTTP next to that file, the page shows **Load sample data**
+in file mode and `?demo=1` analyzes it on load; opened from disk it is unchanged.
