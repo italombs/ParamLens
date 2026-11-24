@@ -116,8 +116,9 @@ and their metric percentiles; no parameter values), so the comparison can be fin
 
 ## FAQ
 
-**Windows blocks the `.exe` (SmartScreen).** The executable is not signed yet (signing through the
-SignPath Foundation is pending). If your company policy offers no "Run anyway", use `ParamLens.html`.
+**Windows blocks the `.exe` (SmartScreen).** The executable is not code-signed, so Windows may warn
+about it: **More info › Run anyway**. If your company policy offers no "Run anyway", ask IT to allow the
+file (the `.sha256` of each release identifies it) or use `ParamLens.html`, which runs in the browser.
 
 **The browser opens instead of the app window.** The WebView2 runtime is missing (it is part of Windows
 11 and of up-to-date Windows 10). Everything works the same in the browser; close the console window to

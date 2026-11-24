@@ -1,6 +1,5 @@
 *.exe
 *.syso
 dist/
-signed/
 *.tmp
 sample/

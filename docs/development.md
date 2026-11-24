@@ -114,6 +114,5 @@ the host, use `host.docker.internal` as the server. The parity and UI checks als
 ## Releases
 
 Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml` on Windows: tests, executable metadata,
-build, standalone HTML, optional SignPath signing, checksums and the GitHub release. Update
-`CHANGELOG.md` before tagging. Signing runs only when the variable `SIGNPATH_ORGANIZATION_ID` and the
-secret `SIGNPATH_API_TOKEN` exist.
+build, standalone HTML, checksums and the GitHub release, whose notes are the version's section of
+`CHANGELOG.md`: add it before tagging.

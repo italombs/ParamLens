@@ -91,9 +91,9 @@ matched by name, RFC 4180 quoting, separator detected; `detectFormat`/`forEachRe
   process and removes the temp file).
 - The generated export queries/bcp command were not yet run on the real server.
 - On the company PC the unsigned `.exe` is blocked by SmartScreen **without** a "Run anyway" option.
-- SignPath Foundation application submitted on 2026-11-20 (maintainer type: individual); waiting for the answer.
-  When approved: create the variable `SIGNPATH_ORGANIZATION_ID` and the secret `SIGNPATH_API_TOKEN` (the signing step runs only when the variable
-  `SIGNPATH_ORGANIZATION_ID` and the secret `SIGNPATH_API_TOKEN` exist).
+- The SignPath Foundation declined the free code signing application (2026-11-24: the project needs more
+  community adoption first). Signing was removed from the repository; the `.exe` ships unsigned. Options later:
+  reapply once the project has users, a Certum open source certificate, or Azure Trusted Signing.
 
 ## Ideas
 Time-window filter (the export already carries the timestamp), detecting a

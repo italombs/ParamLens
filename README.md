@@ -20,7 +20,8 @@ ORs, parameter sniffing, inline `IN` lists and parameter type/size variations.
 | **[ParamLens.html](../../releases/latest/download/ParamLens.html)** | Any browser, fully offline. Analyzes a file you export from SQL Server. Use it when you cannot run the `.exe`. |
 
 Every version ever published stays available on the [Releases](../../releases) page, each with a
-`.sha256` checksum.
+`.sha256` checksum. The `.exe` is not code-signed, so Windows SmartScreen may ask for confirmation
+(**More info › Run anyway**).
 
 ## Quick start
 
@@ -86,11 +87,6 @@ uploads it. See [SECURITY.md](SECURITY.md).
 Bug reports, parser cases from real captures (anonymized!), translations and code are welcome — see
 [CONTRIBUTING.md](CONTRIBUTING.md). Build and architecture notes are in
 [docs/development.md](docs/development.md); changes per version in [CHANGELOG.md](CHANGELOG.md).
-
-## Code signing policy
-
-Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
-Team roles, what is signed and the privacy policy: [Code signing policy](CODE_SIGNING_POLICY.md).
 
 ## License
 

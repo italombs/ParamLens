@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
   build:
@@ -60,34 +59,13 @@ jobs:
           go run ./cmd/paramlens -write-html dist/ParamLens.html
           grep -q 'id="pl-engine"' dist/ParamLens.html
 
-      - name: Upload the unsigned executable
-        id: upload-unsigned
-        uses: actions/upload-artifact@v4
-        with:
-          name: ParamLens-unsigned
-          path: dist/ParamLens.exe
-          if-no-files-found: error
-
-      # Runs only after the project is approved by the SignPath Foundation
-      # (secret SIGNPATH_API_TOKEN and variable SIGNPATH_ORGANIZATION_ID configured).
-      - name: Sign with SignPath
-        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
-        uses: signpath/github-action-submit-signing-request@v1
-        with:
-          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
-          project-slug: 'ParamLens'
-          signing-policy-slug: 'release-signing'
-          artifact-configuration-slug: 'default'
-          github-artifact-id: '${{ steps.upload-unsigned.outputs.artifact-id }}'
-          wait-for-completion: true
-          output-artifact-directory: 'signed'
-
-      - name: Pick the binary (signed if available)
+      - name: Checksums and release notes
         shell: bash
         run: |
-          if [ -f signed/ParamLens.exe ]; then cp signed/ParamLens.exe dist/ParamLens.exe; echo "Using the signed binary"; fi
           cd dist && sha256sum ParamLens.exe > ParamLens.exe.sha256 && sha256sum ParamLens.html > ParamLens.html.sha256 && cat *.sha256
+          # the notes are the section of this version in CHANGELOG.md
+          awk -v v="${{ steps.ver.outputs.version }}" '/^## \[/{ if (on) exit; on = index($0, "## [" v "]") == 1; next } on' ../CHANGELOG.md > notes.md
+          test -s notes.md
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
@@ -97,6 +75,5 @@ jobs:
             dist/ParamLens.exe.sha256
             dist/ParamLens.html
             dist/ParamLens.html.sha256
+          body_path: dist/notes.md
           generate_release_notes: true
-          body: |
-            [Code signing policy](https://github.com/italombs/ParamLens/blob/main/CODE_SIGNING_POLICY.md): free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).

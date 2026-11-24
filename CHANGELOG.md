@@ -9,7 +9,10 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 ### Changed
 - README and feature tour: new usage GIF and screenshots of the parameter export and of the before × after
   comparison, and a "from diagnosis to a measured fix" walkthrough.
+- Release notes now come from this changelog.
 
+### Removed
+- Code signing policy and the SignPath signing step: the `.exe` is published unsigned.
 ## [1.4.0] - 2026-11-23
 
 ### Added
