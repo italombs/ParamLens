@@ -13,6 +13,7 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 
 ### Removed
 - Code signing policy and the SignPath signing step: the `.exe` is published unsigned.
+
 ## [1.4.0] - 2026-11-23
 
 ### Added
