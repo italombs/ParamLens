@@ -5,7 +5,7 @@ name: Online demo
 on:
   push:
     branches: [main]
-    paths: ['web/**', 'internal/**', 'cmd/**', 'go.mod', 'go.sum', '.github/workflows/pages.yml']
+    paths: ['web/**', 'internal/**', 'cmd/**', 'go.mod', 'go.sum', 'docs/images/social-preview.png', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -34,6 +34,21 @@ jobs:
           go run ./cmd/paramlens -write-demo _site/sample-data.tsv
           grep -q 'id="pl-engine"' _site/index.html
           touch _site/.nojekyll
+
+      # link preview (LinkedIn, WhatsApp, Slack...): only in the published page, not in the .exe/.html
+      - name: Link preview tags
+        run: |
+          base=https://italombs.github.io/ParamLens/
+          desc="Parameter profiling for SQL Server Extended Events captures: catch-all ORs, call shapes, parameter sniffing and before/after comparison. Runs in your browser on sample data; nothing is uploaded."
+          cp docs/images/social-preview.png _site/social-preview.png
+          tags="<meta name=\"description\" content=\"$desc\">"
+          tags="$tags<meta property=\"og:type\" content=\"website\"><meta property=\"og:site_name\" content=\"ParamLens\">"
+          tags="$tags<meta property=\"og:title\" content=\"ParamLens: try it in your browser\">"
+          tags="$tags<meta property=\"og:description\" content=\"$desc\"><meta property=\"og:url\" content=\"$base\">"
+          tags="$tags<meta property=\"og:image\" content=\"${base}social-preview.png\"><meta property=\"og:image:width\" content=\"1280\"><meta property=\"og:image:height\" content=\"640\">"
+          tags="$tags<meta name=\"twitter:card\" content=\"summary_large_image\">"
+          sed -i "0,/<\/head>/s||$tags</head>|" _site/index.html
+          grep -q 'og:image' _site/index.html
 
       - uses: actions/upload-pages-artifact@v3
 
