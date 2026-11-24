@@ -6,6 +6,8 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-24
+
 ### Added
 - Online demo: `ParamLens.html` on GitHub Pages with synthetic sample data
   (<https://italombs.github.io/ParamLens/?demo=1>), analyzed in the browser.
@@ -100,7 +102,8 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 - First release: `ParamLens.exe`, parameter profiling of `rpc_completed` captures from a table or a
   `.xel` file, with catch-all detection, call shapes, combinations, findings and an exportable report.
 
-[Unreleased]: https://github.com/italombs/ParamLens/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/italombs/ParamLens/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/italombs/ParamLens/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/italombs/ParamLens/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/italombs/ParamLens/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/italombs/ParamLens/compare/v1.2.0...v1.3.0
