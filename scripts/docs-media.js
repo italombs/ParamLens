@@ -13,8 +13,6 @@ const { chromium } = require("playwright");
 const [binPath, htmlPath, tsvPath] = process.argv.slice(2);
 const out = path.resolve("docs/images");
 const videoDir = path.resolve("dist/media");
-fs.mkdirSync(out, { recursive: true });
-fs.mkdirSync(videoDir, { recursive: true });
 const pause = ms => new Promise(r => setTimeout(r, ms));
 const shot = (loc, name) => loc.screenshot({ path: path.join(out, name) }).then(() => console.log("wrote", name));
 
@@ -70,7 +68,9 @@ async function compareWithRewrite(page, file, wait = 0) {
   await page.waitForFunction(() => /[−+]\d/.test(document.querySelector("#cmpOut").textContent));
 }
 
-(async () => {
+async function main() {
+  fs.mkdirSync(out, { recursive: true });
+  fs.mkdirSync(videoDir, { recursive: true });
   const browser = await chromium.launch();
   let { srv, url } = await startServer();
 
@@ -162,4 +162,7 @@ async function compareWithRewrite(page, file, wait = 0) {
 
   await browser.close();
   srv.kill();
-})().catch(e => { console.error(e); process.exit(1); });
+}
+
+module.exports = { writeRewriteCapture, compareWithRewrite };
+if (require.main === module) main().catch(e => { console.error(e); process.exit(1); });
