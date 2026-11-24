@@ -10,8 +10,15 @@ and the project uses [semantic versioning](https://semver.org/). Downloads of ev
 - Online demo: `ParamLens.html` on GitHub Pages with synthetic sample data
   (<https://italombs.github.io/ParamLens/?demo=1>), analyzed in the browser.
 - `-write-demo <file>` writes the sample data as an exported TSV file.
+- **Hard-coded values in the parameter export:** the dialog lists the inline `IN` lists and the literals
+  compared with a column, and suggests which columns to export (every parameter plus the values that
+  change between calls). `IN` lists go as `nvarchar(max)` with the values separated by commas, ready
+  for `STRING_SPLIT`; the replay loop then runs the query with those values as parameters
+  (`IN (SELECT value FROM STRING_SPLIT(@list, N','))`).
 
 ### Changed
+- Parameter export by distinct combination now also tells combinations apart by their `IN` list values
+  (regrouped when that column is left out).
 - README and feature tour: new usage GIF and screenshots of the parameter export and of the before × after
   comparison, and a "from diagnosis to a measured fix" walkthrough.
 - Release notes now come from this changelog.

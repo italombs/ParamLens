@@ -67,6 +67,9 @@ func parityExtraRows() []engine.Row {
 		// strings que parecem números (nan, 1e5, $)
 		"exec sp_executesql N'select * from t where (@s = 100000 OR x = @s) and (@t = 0 OR y = @t)',N'@s nvarchar(10),@t nvarchar(10)',@s=N'1e5',@t=N'nan'",
 		"exec sp_executesql N'select * from t where (@s = 100000 OR x = @s) and (@t = 0 OR y = @t)',N'@s nvarchar(10),@t nvarchar(10)',@s=N' $3 ',@t=N'0'",
+		// hard-coded values after non-ASCII text (byte × UTF-16 positions), BETWEEN, LIKE, CASE, types
+		"exec sp_executesql N'select ''São João 😀'' as n from t where t.Nome = N''Conceição'' and t.S <> 6 and t.D between -5 and 2.5 and t.A in (N''ç'', N''b'') and t.L like ''a%'' and case when t.K = 1 then ''x'' end = N''x'' and 7 = t.Q and t.B = 3000000000 and t.X = 0x0A and @z = 0',N'@z int',@z=1",
+		"exec sp_executesql N'select ''São João 😀'' as n from t where t.Nome = N''Ação'' and t.S <> 6 and t.D between -1 and 3 and t.A in (N''a,b'') and t.L like ''b%'' and case when t.K = 2 then ''x'' end = N''y'' and 8 = t.Q and t.B = 5 and t.X = 0x0B and @z = 0',N'@z int',@z=2",
 		// parâmetro sem valor e argumento extra
 		"exec sp_executesql N'select * from t where a = @a and b = @b',N'@a int,@b int',@a=1,@c=3",
 	}

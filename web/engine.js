@@ -504,6 +504,141 @@ function lessValue(a, b) {
   return cmpStr(a, b) < 0;
 }
 
+/* ---------- hard-coded values (literals.go) ---------- */
+
+const CMP_OPS = new Set(["=", "<>", "!=", "<", ">", "<=", ">=", "!<", "!>"]);
+const NONE_TOK = { k: TK.OP, t: "", v: "", p: 0 };
+function isCmp(t) { return (t.k === TK.OP && CMP_OPS.has(t.t)) || is(t, "like"); }
+function isValueTok(t) { return t.k === TK.VAR || isLiteral(t); }
+function tokAt(toks, i) { return i < 0 || i >= toks.length ? NONE_TOK : toks[i]; }
+
+// IN lists of literals and literals compared with a column, in text order (see literals.go)
+function extractLiterals(sql) {
+  const toks = tokenize(sql);
+  const out = [];
+  let betweenEnd = -1, betweenLabel = "";
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (is(t, "in") && i + 1 < toks.length && isOp(toks[i + 1], "(")) {
+      const rl = readLiteralList(toks, i + 2);
+      if (rl) {
+        const lb = labelBefore(toks, i);
+        const vals = rl.vals.slice().sort((a, b) => lessValue(a, b) ? -1 : lessValue(b, a) ? 1 : 0);
+        const plain = [];
+        let comma = false;
+        for (const v of vals) {
+          if (v === "NULL") continue;
+          if (v[0] === "'") { plain.push(v.slice(1, -1).replace(/''/g, "'")); comma = comma || v.includes(","); }
+          else plain.push(v);
+        }
+        const e = toks[rl.end];
+        out.push({ name: (lb.not ? "NOT IN " : "IN ") + lb.label, label: lb.label, list: true, value: plain.join(","), type: "nvarchar", comma,
+          start: toks[i + 1].p, end: e.p + e.t.length });
+        i = rl.end;
+        continue;
+      }
+    }
+    const start = i;
+    let last = i;
+    if ((isOp(t, "-") || isOp(t, "+")) && i + 1 < toks.length && toks[i + 1].k === TK.NUMBER && i > 0 &&
+      (isCmp(toks[i - 1]) || is(toks[i - 1], "between") || is(toks[i - 1], "and"))) {
+      last = i + 1;
+    } else if (t.k !== TK.STRING && t.k !== TK.NUMBER && t.k !== TK.BINARY) {
+      continue;
+    }
+    const lit = toks[last];
+    let value = canonLiteral(lit);
+    if (last > start && t.t === "-") value = "-" + value;
+    let name = "", label = "";
+    const prev = tokAt(toks, start - 1);
+    if (isCmp(prev)) {
+      if (!isValueTok(tokAt(toks, start - 2))) {
+        const lb = labelBefore(toks, start - 1);
+        let lbl = lb.label;
+        if (lowerGo(lbl) === "end") lbl = "expr";
+        let op = prev.t;
+        if (prev.k === TK.IDENT) op = lb.not ? "NOT LIKE" : "LIKE";
+        name = lbl + " " + op; label = lbl;
+      }
+    } else if (is(prev, "between")) {
+      if (!isValueTok(tokAt(toks, start - 2))) {
+        const lbl = labelBefore(toks, start - 1).label;
+        name = lbl + " BETWEEN"; label = lbl;
+        betweenEnd = last; betweenLabel = lbl;
+      }
+    } else if (is(prev, "and") && betweenEnd === start - 2) {
+      name = betweenLabel + " AND"; label = betweenLabel;
+    } else {
+      const next = tokAt(toks, last + 1);
+      if (last === start && isCmp(next) && next.k === TK.OP && !isOp(tokAt(toks, start - 1), "-") && !isOp(tokAt(toks, start - 1), "+")) {
+        const other = tokAt(toks, last + 2);
+        if ((other.k === TK.IDENT || other.k === TK.QIDENT) && !isValueTok(other)) {
+          label = labelAfter(toks, last + 2);
+          name = label + " " + next.t;
+        }
+      }
+    }
+    if (!name) continue;
+    out.push({ name, label, list: false, value, type: literalType(lit), comma: false, start: toks[start].p, end: lit.p + lit.t.length });
+    i = last;
+  }
+  return out;
+}
+
+function labelAfter(toks, i) {
+  const parts = [];
+  while (i < toks.length && (toks[i].k === TK.IDENT || toks[i].k === TK.QIDENT)) {
+    parts.push(toks[i].t);
+    if (i + 2 < toks.length && isOp(toks[i + 1], ".")) { i += 2; continue; }
+    break;
+  }
+  return parts.length ? parts.join(".") : "expr";
+}
+
+function literalType(t) {
+  if (t.k === TK.STRING) return t.t[0] === "N" || t.t[0] === "n" ? "nvarchar" : "varchar";
+  if (t.k === TK.BINARY) return "varbinary";
+  const s = t.t;
+  if (/[eE]/.test(s)) return "float";
+  if (s.includes("$")) return "money";
+  if (s.includes(".")) return "decimal";
+  const d = s.replace(/^0+/, "");
+  if (d.length < 10 || (d.length === 10 && d <= "2147483647")) return "int";
+  if (d.length < 19 || (d.length === 19 && d <= "9223372036854775807")) return "bigint";
+  return "decimal";
+}
+
+const TYPE_RANK = { int: 1, bigint: 2, decimal: 3, money: 3, float: 4 };
+function widenType(a, b) {
+  if (a === b || b === "") return a;
+  if (a === "") return b;
+  const ra = TYPE_RANK[a] || 0, rb = TYPE_RANK[b] || 0;
+  if (ra > 0 && rb > 0) {
+    if (ra === 3 && rb === 3) return "decimal";
+    return ra > rb ? a : b;
+  }
+  return "nvarchar";
+}
+
+function literalVar(label, list, used) {
+  let s = label;
+  const k = s.lastIndexOf(".");
+  if (k >= 0) s = s.slice(k + 1);
+  let b = "";
+  for (const r of s) {
+    if (r === "[" || r === "]" || r === '"') continue;
+    b += /^[A-Za-z0-9_]$/.test(r) ? r : "_";
+  }
+  let base = b.replace(/^_+|_+$/g, "");
+  if (base === "" || base === "expr") base = "value";
+  if (base[0] >= "0" && base[0] <= "9") base = "v" + base;
+  if (list) base += "_list";
+  let v = "@" + base, n = 2;
+  while (used.has(lowerGo(v))) v = "@" + base + "_" + (n++);
+  used.add(lowerGo(v));
+  return v;
+}
+
 function patternCond(p) {
   if (p.op === "IS NULL" || p.op === "IS NOT NULL") return p.var + " " + p.op;
   if (p.rightVar) return p.var + " " + p.op + " " + p.rightVar;
@@ -861,7 +996,7 @@ class Engine {
     const f = this.fams[id];
     if (!f) return null;
     if (mode !== "combos") mode = "execs";
-    const pt = { family: f.id, kind: f.kind, proc: f.proc, sql: f.sampleSQL, decl: "", mode, has: this.has.slice(), lists: 0, params: [], rows: [], failed: 0 };
+    const pt = { family: f.id, kind: f.kind, proc: f.proc, sql: f.sampleSQL, decl: "", mode, has: this.has.slice(), lists: 0, params: [], literals: [], sqlParts: [], rows: [], failed: 0 };
     let best = null;
     for (const [k, v] of f.decls) if (!best || v > best.v || (v === best.v && cmpStr(k, best.k) < 0)) best = { k, v };
     if (best) pt.decl = best.k;
@@ -875,6 +1010,22 @@ class Engine {
       pt.params.push({ name: p.name, types });
       colOf[i] = ncols++;
     });
+    if (f.kind !== "proc") {
+      const lits = extractLiterals(f.sampleSQL);
+      if (lits.length) {
+        const used = new Set();
+        for (const p of f.params) used.add(lowerGo(p.name));
+        for (const t of tokenize(f.sampleSQL)) if (t.k === TK.VAR) used.add(lowerGo(t.t));
+        let prev = 0;
+        for (const l of lits) {
+          pt.sqlParts.push(f.sampleSQL.slice(prev, l.start));
+          pt.literals.push({ name: l.name, var: literalVar(l.label, l.list, used), list: l.list, type: l.type, comma: l.comma, text: f.sampleSQL.slice(l.start, l.end) });
+          prev = l.end;
+        }
+        pt.sqlParts.push(f.sampleSQL.slice(prev));
+      }
+    }
+    const nlits = pt.literals.length;
     const byKey = new Map();
     const B = 2000;
     for (let s = 0; s < f.execs.length; s += B) {
@@ -883,6 +1034,7 @@ class Engine {
       ixs.forEach((ix, k) => {
         const ex = this.execs[ix];
         const vals = new Array(ncols).fill(ABSENT);
+        const lits = new Array(nlits).fill(ABSENT);
         const rpc = stmts[k] == null ? null : parseRPC(stmts[k], true);
         if (!rpc || rpc.err) pt.failed++;
         else {
@@ -890,9 +1042,13 @@ class Engine {
             const pi = f.pidx.get(lowerGo(p.name));
             if (pi !== undefined && colOf[pi] >= 0) vals[colOf[pi]] = p.value;
           }
+          if (nlits) {
+            const el = extractLiterals(rpc.sql);
+            if (el.length === nlits) el.forEach((l, k) => { lits[k] = l.value; pt.literals[k].type = widenType(pt.literals[k].type, l.type); pt.literals[k].comma = pt.literals[k].comma || l.comma; });
+          }
         }
-        if (mode === "execs") { pt.rows.push({ values: vals, count: 1, sum: ex.m.slice(), exec: ix }); return; }
-        const key = vals.join("\x00");
+        if (mode === "execs") { pt.rows.push({ values: vals, lits, count: 1, sum: ex.m.slice(), exec: ix }); return; }
+        const key = vals.join("\x00") + "\x01" + lits.join("\x00");
         const r = byKey.get(key);
         if (r !== undefined) {
           const row = pt.rows[r];
@@ -901,7 +1057,7 @@ class Engine {
           return;
         }
         byKey.set(key, pt.rows.length);
-        pt.rows.push({ values: vals, count: 1, sum: ex.m.slice(), exec: ix });
+        pt.rows.push({ values: vals, lits, count: 1, sum: ex.m.slice(), exec: ix });
       });
     }
     if (mode === "combos") pt.rows.sort((a, b) => (b.count - a.count) || (a.exec - b.exec));

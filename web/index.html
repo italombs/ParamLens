@@ -103,6 +103,10 @@ tr.click:hover td{background:var(--soft)}
 .badge.c-low{background:var(--accent-soft);color:var(--accent)}
 .badge.c-high{background:var(--info-soft);color:var(--info)}
 .badge.ps{background:var(--mid-soft);color:var(--mid)}
+.pxCols{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px 10px}
+.pxCols .chk{margin:4px 0;flex-wrap:wrap}
+.pxCols code{font-size:12.5px}
+.pxCols .warn{color:var(--bad,#b42318);font-size:12px}
 .pbar{display:flex;align-items:center;gap:6px;min-width:96px}
 .pbar .b{flex:1;height:8px;background:var(--soft);border-radius:4px;overflow:hidden;min-width:40px}
 .pbar .b i{display:block;height:100%;background:var(--bar)}
@@ -349,9 +353,15 @@ ol.steps li{margin:2px 0}
         <select id="pxMode"><option value="execs" data-i18n="px.execs"></option><option value="combos" data-i18n="px.combos"></option></select></label>
       <label class="f"><span data-i18n="px.table"></span><input type="text" id="pxTable" value="dbo.paramlens_params"></label>
     </div>
+    <div>
+      <b class="nf" data-i18n="px.cols"></b>
+      <p class="hint" data-i18n="px.colsHint" style="margin:2px 0 6px"></p>
+      <div id="pxCols" class="pxCols"></div>
+    </div>
     <div class="seg" id="segPx" style="margin:0"><button data-v="script" class="on" data-i18n="px.script"></button><button data-v="csv">CSV</button><button data-v="db" id="pxDbTab" data-i18n="px.db"></button></div>
     <div id="pxScript">
       <label class="chk"><input type="checkbox" id="pxReplay" checked> <span data-i18n="px.replay"></span></label>
+      <p class="hint hidden" id="pxReplayNote" data-i18n="px.replayAll" style="margin:0 0 4px 24px"></p>
       <label class="chk"><input type="checkbox" id="pxDrop"> <span data-i18n="px.drop"></span></label>
     </div>
     <p class="hint hidden" id="pxCsv" data-i18n="px.csvHint"></p>
@@ -475,7 +485,10 @@ en: {
   "px.drop":"Drop the table if it already exists",
   "px.goScript":"Download script", "px.goCsv":"Download CSV", "px.goDb":"Insert rows",
   "px.reading":"Reading the values…", "px.inserting":"Inserting {0} rows…", "px.inserted":"✓ {0} rows inserted into {1}", "px.done":"✓ {0} rows exported",
-  "px.lists":"This query has {0} inline IN list(s): their values are part of the SQL text, not parameters, so they are not exported.",
+  "px.cols":"Columns", "px.colsHint":"Suggested: every parameter and the hard-coded values of the SQL that change between calls. IN lists go as nvarchar(max) with the values separated by commas, ready for STRING_SPLIT.",
+  "px.kParam":"parameter", "px.kLit":"hard-coded", "px.kList":"IN list", "px.const":"always {0}", "px.distinct":"{0} distinct values",
+  "px.comma":"⚠ an item has a comma inside: STRING_SPLIT would split it", "px.noCols":"No parameters or hard-coded values: only the metrics will be exported.",
+  "px.replayAll":"The replay needs every parameter: select them all to enable it.",
   "px.failed":"{0} statement(s) could not be read again (their values are NULL).",
   "px.noParams":"This query has no parameters: only the metrics will be exported.",
   "px.connected":"Connection of the start screen: {0}", "px.connect":"Connect to the server where the table will be created:",
@@ -570,7 +583,10 @@ en: {
   "px.drop":"Apagar a tabela se ela já existir",
   "px.goScript":"Baixar script", "px.goCsv":"Baixar CSV", "px.goDb":"Inserir linhas",
   "px.reading":"Lendo os valores…", "px.inserting":"Inserindo {0} linhas…", "px.inserted":"✓ {0} linhas inseridas em {1}", "px.done":"✓ {0} linhas exportadas",
-  "px.lists":"Esta query tem {0} lista(s) IN inline: os valores fazem parte do texto SQL, não são parâmetros, por isso não são exportados.",
+  "px.cols":"Colunas", "px.colsHint":"Sugestão: todos os parâmetros e os valores fixos no SQL que mudam entre as chamadas. Listas IN vão como nvarchar(max) com os valores separados por vírgula, prontas para STRING_SPLIT.",
+  "px.kParam":"parâmetro", "px.kLit":"fixo no código", "px.kList":"lista IN", "px.const":"sempre {0}", "px.distinct":"{0} valores distintos",
+  "px.comma":"⚠ um item tem vírgula: o STRING_SPLIT o dividiria", "px.noCols":"Sem parâmetros nem valores fixos: só as métricas serão exportadas.",
+  "px.replayAll":"O replay precisa de todos os parâmetros: selecione todos para habilitá-lo.",
   "px.failed":"{0} statement(s) não puderam ser lidos de novo (os valores ficam NULL).",
   "px.noParams":"Esta query não tem parâmetros: só as métricas serão exportadas.",
   "px.connected":"Conexão da tela inicial: {0}", "px.connect":"Conecte no servidor onde a tabela será criada:",
@@ -1160,7 +1176,7 @@ document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ $("#sampleOv").c
 
 /* ---------- export the parameters of a query: script, CSV or straight into a table ---------- */
 const PX_METRIC = ["duration_us","cpu_us","logical_reads","physical_reads","writes","row_count"];
-const PX = {fam:null, cache:{}, conn:null, dbs:null};
+const PX = {fam:null, cache:{}, conn:null, dbs:null, sel:null, last:null};
 function nowStamp(){
   const now = new Date(), p2 = n=>String(n).padStart(2,"0");
   return `${now.getFullYear()}-${p2(now.getMonth()+1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
@@ -1186,13 +1202,73 @@ function pxType(types){
   }
   return `${base}(${Math.max(...ps.map(p=>+p[2]||0))})`;
 }
-function pxColumns(pt){
+// value of a hard-coded column: lists are plain text ("1,2,3"), scalars canonical literals
+const pxLitVal = (l, v)=> v === "(absent)" ? {k:"null"} : l.list ? {k:"str", v} : pxLit(v);
+// column type of a hard-coded value: lists nvarchar(max), the others sized by their values
+function pxLitType(l, rows, k){
+  if(l.list) return "nvarchar(max)";
+  const vs = rows.map(r=>pxLitVal(l, r.lits[k])).filter(x=>x.k!=="null");
+  if(l.type === "nvarchar" || l.type === "varchar"){
+    const n = Math.max(1, ...vs.map(x=>x.v.length)), lim = l.type === "nvarchar" ? 4000 : 8000;
+    return `${l.type}(${n > lim ? "max" : n})`;
+  }
+  if(l.type === "decimal"){
+    let ip = 1, sc = 0;
+    for(const x of vs){ const [a, b=""] = x.v.replace(/^[+-]/,"").split("."); ip = Math.max(ip, a.replace(/^0+/,"").length); sc = Math.max(sc, b.length) }
+    return `decimal(${Math.min(38, ip+sc)},${Math.min(sc, 38)})`;
+  }
+  return l.type === "varbinary" ? "varbinary(max)" : l.type;
+}
+// what each export column holds, for the chooser: distinct values, a constant, commas inside list items
+function pxColInfo(pt){
+  const info = (get, n)=>{ const s = new Set(); for(const r of pt.rows){ s.add(get(r)); if(s.size > 1000) break } return s };
+  return {
+    params: pt.params.map((p,k)=>{ const s = info(r=>r.values[k]); return {n:s.size, one:[...s][0]} }),
+    lits: pt.literals.map((l,k)=>{ const s = info(r=>r.lits[k]); return {n:s.size, one:[...s][0]} })
+  };
+}
+// selection of the export columns: key "p:<i>" (parameter) or "l:<i>" (hard-coded value)
+function pxSelected(key){ return !PX.sel || PX.sel[key] !== false }
+function pxDefaultSel(pt){
+  const ci = pxColInfo(pt);
+  PX.sel = {};
+  pt.literals.forEach((l,k)=>{ PX.sel["l:"+k] = ci.lits[k].n > 1 });
+}
+function pxRenderCols(pt){
+  const box = $("#pxCols"), ci = pxColInfo(pt);
+  const row = (key, name, kind, cls, type, info, warn)=> `<label class="chk"><input type="checkbox" data-px="${key}" ${pxSelected(key)?"checked":""}>
+    <code>${esc(name)}</code> <span class="badge ${cls}">${esc(t(kind))}</span> <span class="hint">${esc(type)} · ${esc(info)}</span>${warn?` <span class="warn">${esc(warn)}</span>`:""}</label>`;
+  const vinfo = (c, l)=> c.n > 1 ? t("px.distinct", c.n > 1000 ? fN(1000)+"+" : fN(c.n)) : t("px.const", l && l.list ? c.one : tv(c.one));
+  // hard-coded values first: they are the ones to decide on
+  let h = pt.literals.map((l,k)=> row("l:"+k, l.var + "  ←  " + l.name, l.list ? "px.kList" : "px.kLit", l.list ? "c-low" : "ps",
+    pxLitType(l, pt.rows, k), vinfo(ci.lits[k], l), l.comma ? t("px.comma") : "")).join("");
+  h += pt.params.map((p,k)=> row("p:"+k, p.name, "px.kParam", "", pxType(p.types), vinfo(ci.params[k]))).join("");
+  PX.last = pt;
+  box.innerHTML = h || `<p class="hint">${esc(t("px.noCols"))}</p>`;
+  pxRender();
+}
+// rows for the chosen columns: combinations are grouped again when some value column is left out
+function pxRows(pt){
+  const ps = pt.params.map((_,k)=>pxSelected("p:"+k)), ls = pt.literals.map((_,k)=>pxSelected("l:"+k));
+  if(pt.mode !== "combos" || (ps.every(Boolean) && ls.every(Boolean))) return pt.rows;
+  const by = new Map(), out = [];
+  for(const r of pt.rows){
+    const key = r.values.filter((_,k)=>ps[k]).join("\x00") + "\x01" + r.lits.filter((_,k)=>ls[k]).join("\x00");
+    const g = by.get(key);
+    if(g){ g.count += r.count; r.sum.forEach((v,m)=> g.sum[m] += v); g.exec = Math.min(g.exec, r.exec); continue }
+    const n = {values:r.values, lits:r.lits, count:r.count, sum:r.sum.slice(), exec:r.exec};
+    by.set(key, n); out.push(n);
+  }
+  return out.sort((a,b)=> (b.count-a.count) || (a.exec-b.exec));
+}
+function pxColumns(pt, rows){
   const used = new Set();
   const uniq = n=>{ const b = n.replace(/[[\]]/g,"") || "p"; let s = b, i = 2; while(used.has(s.toLowerCase())) s = b+"_"+(i++); used.add(s.toLowerCase()); return s };
   const ex = pt.mode === "execs";
   const cols = [{name:uniq(ex?"exec_no":"combo_no"), type:"int", get:(r,i)=>({k:"num", v:String(i+1)})}];
   if(!ex) cols.push({name:uniq("executions"), type:"int", get:r=>({k:"num", v:String(r.count)})});
-  pt.params.forEach((p,k)=> cols.push({name:uniq(p.name[0]==="#" ? "p"+p.name.slice(1) : p.name.replace(/^@/,"")), type:pxType(p.types), param:p.name, get:r=>pxLit(r.values[k])}));
+  pt.params.forEach((p,k)=>{ if(pxSelected("p:"+k)) cols.push({name:uniq(p.name[0]==="#" ? "p"+p.name.slice(1) : p.name.replace(/^@/,"")), type:pxType(p.types), param:p.name, get:r=>pxLit(r.values[k])}) });
+  pt.literals.forEach((l,k)=>{ if(pxSelected("l:"+k)) cols.push({name:uniq(l.var.slice(1)), type:pxLitType(l, rows, k), lit:l, k, get:r=>pxLitVal(l, r.lits[k])}) });
   pt.has.forEach((h,m)=>{ if(h) cols.push(ex
     ? {name:uniq(PX_METRIC[m]), type:"bigint", get:r=>({k:"num", v:String(r.sum[m])})}
     : {name:uniq("avg_"+PX_METRIC[m]), type:"decimal(19,2)", get:r=>({k:"num", v:(r.sum[m]/r.count).toFixed(2)})}) });
@@ -1210,53 +1286,70 @@ function pxSplitTable(s){
   return ps.length >= 2 ? [ps[ps.length-2], ps[ps.length-1]] : ["dbo", ps[0] || "paramlens_params"];
 }
 const pxSql = x=> x.k==="null" ? "NULL" : x.k==="str" ? sqlStr(x.v) : x.v;
-function pxScript(pt, cols){
+// the query text with the chosen hard-coded values as parameters (IN lists through STRING_SPLIT)
+function pxParamSQL(pt, ls){
+  if(!ls.length || !pt.sqlParts.length) return pt.sql;
+  const on = new Set(ls.map(c=>c.k));
+  return pt.sqlParts.map((p,k)=> k === 0 ? p : (on.has(k-1)
+    ? (pt.literals[k-1].list ? `(SELECT value FROM STRING_SPLIT(${pt.literals[k-1].var}, N','))` : pt.literals[k-1].var)
+    : pt.literals[k-1].text) + p).join("");
+}
+function pxScript(pt, rows, cols){
   const [sc, tb] = pxSplitTable($("#pxTable").value), T = qn(sc)+"."+qn(tb), ex = pt.mode==="execs";
   const fam = (ov.families||[]).find(f=>f.id===pt.family) || {title:""};
-  const L = [`-- ParamLens: parameters of one query, ${pt.rows.length} row(s), one per ${ex?"execution":"distinct combination of values"}`,
+  const ls = cols.filter(c=>c.lit);
+  const L = [`-- ParamLens: parameters of one query, ${rows.length} row(s), one per ${ex?"execution":"distinct combination of values"}`,
     `-- Query: ${fam.title.replace(/\s+/g," ")}`,
     `-- Capture: ${(hdr&&hdr.label)||""} · generated ${nowStamp()}`,
     "-- Values exactly as sent by the application; duration and CPU in microseconds."];
-  if(pt.lists) L.push(`-- Note: ${pt.lists} inline IN list(s) are part of the SQL text and are not exported.`);
+  if(ls.length){
+    L.push("-- Hard-coded values of the SQL text exported as columns:");
+    for(const c of ls) L.push(`--   ${qn(c.name)}: ${c.lit.name.replace(/\s+/g," ")}${c.lit.list ? " (values separated by commas, for STRING_SPLIT)" : ""}`);
+  }
   L.push("SET NOCOUNT ON;", "SET DATEFORMAT ymd;");
   if($("#pxDrop").checked) L.push(`IF OBJECT_ID(${sqlStr(T)}, N'U') IS NOT NULL DROP TABLE ${T};`);
   L.push(`IF OBJECT_ID(${sqlStr(T)}, N'U') IS NULL\nCREATE TABLE ${T} (\n  ${cols.map((c,i)=>qn(c.name)+" "+c.type+(i===0?" NOT NULL":" NULL")).join(",\n  ")}\n);`, "GO");
   const head = `INSERT INTO ${T} (${cols.map(c=>qn(c.name)).join(", ")}) VALUES`;
-  for(let s = 0; s < pt.rows.length; s += 1000){
+  for(let s = 0; s < rows.length; s += 1000){
     const part = [];
-    for(let i = s; i < Math.min(pt.rows.length, s+1000); i++) part.push("(" + cols.map(c=>pxSql(c.get(pt.rows[i], i))).join(", ") + ")");
+    for(let i = s; i < Math.min(rows.length, s+1000); i++) part.push("(" + cols.map(c=>pxSql(c.get(rows[i], i))).join(", ") + ")");
     L.push(head + "\n" + part.join(",\n") + ";", "GO");
   }
-  if($("#pxReplay").checked){
-    const ps = cols.filter(c=>c.param), vars = ["@n", ...ps.map((c,i)=>"@v"+(i+1))];
+  if($("#pxReplay").checked && pxReplayOK(pt)){
+    const ps = cols.filter(c=>c.param), lps = pt.kind === "proc" ? [] : ls, vars = ["@n", ...ps.map((c,i)=>"@v"+(i+1)), ...lps.map((c,i)=>"@v"+(ps.length+i+1))];
     // several declarations (e.g. nvarchar(20) × nvarchar(400)): the widest types, so no value is cut
     const varied = pt.params.some(p=>(p.types||[]).length > 1);
-    const decl = varied ? ps.filter(c=>c.param[0]!=="#").map(c=>c.param+" "+c.type).join(",") : pt.decl;
+    const decl = [varied ? ps.filter(c=>c.param[0]!=="#").map(c=>c.param+" "+c.type).join(",") : pt.decl, ...lps.map(c=>c.lit.var+" "+c.type)].filter(Boolean).join(",");
     let call;
     if(pt.kind === "proc"){
       const pos = ps.map((c,i)=>[c,i]).filter(([c])=>c.param[0]==="#"), named = ps.map((c,i)=>[c,i]).filter(([c])=>c.param[0]!=="#");
       const args = [...pos.map(([c,i])=>"@v"+(i+1)), ...named.map(([c,i])=>`${c.param} = @v${i+1}`)];
       call = `EXEC ${pt.proc.split(".").map(qn).join(".")}${args.length?" "+args.join(", "):""};`;
     } else {
-      const args = ps.map((c,i)=>[c,i]).filter(([c])=>c.param[0]!=="#").map(([c,i])=>`${c.param} = @v${i+1}`);
+      const args = [...ps.map((c,i)=>[c,i]).filter(([c])=>c.param[0]!=="#").map(([c,i])=>`${c.param} = @v${i+1}`),
+        ...lps.map((c,i)=>`${c.lit.var} = @v${ps.length+i+1}`)];
       call = `EXEC sp_executesql @stmt${decl?", @params":""}${args.length?", "+args.join(", "):""};`;
     }
     L.push("", `-- Replay: runs the query once per ${ex?"row":"combination"} (same text and parameter declaration as the application),`,
       "-- so each call shows up in Query Store / Extended Events. Set @run = 1 to execute it.",
       "DECLARE @run bit = 0;", "IF @run = 1", "BEGIN");
+    if(lps.length) L.splice(L.length-3, 0, "-- The exported hard-coded values are parameters of the replayed text; IN lists use STRING_SPLIT",
+      "-- (compatibility level 130 or later).");
     if(varied) L.splice(L.length-3, 0, "-- The application sent this query with different parameter declarations; the replay uses the widest types.");
-    if(pt.kind !== "proc") L.push(`    DECLARE @stmt nvarchar(max) = ${sqlStr(pt.sql)};`, ...(decl?[`    DECLARE @params nvarchar(max) = ${sqlStr(decl)};`]:[]));
-    L.push(`    DECLARE @n int${ps.map((c,i)=>`, @v${i+1} ${c.type}`).join("")};`,
-      `    DECLARE replay CURSOR LOCAL FAST_FORWARD FOR SELECT ${[cols[0], ...ps].map(c=>qn(c.name)).join(", ")} FROM ${T} ORDER BY ${qn(cols[0].name)};`,
+    if(pt.kind !== "proc") L.push(`    DECLARE @stmt nvarchar(max) = ${sqlStr(pxParamSQL(pt, lps))};`, ...(decl?[`    DECLARE @params nvarchar(max) = ${sqlStr(decl)};`]:[]));
+    L.push(`    DECLARE @n int${[...ps, ...lps].map((c,i)=>`, @v${i+1} ${c.type}`).join("")};`,
+      `    DECLARE replay CURSOR LOCAL FAST_FORWARD FOR SELECT ${[cols[0], ...ps, ...lps].map(c=>qn(c.name)).join(", ")} FROM ${T} ORDER BY ${qn(cols[0].name)};`,
       "    OPEN replay;", `    FETCH NEXT FROM replay INTO ${vars.join(", ")};`, "    WHILE @@FETCH_STATUS = 0", "    BEGIN",
       "        " + call, `        FETCH NEXT FROM replay INTO ${vars.join(", ")};`, "    END;", "    CLOSE replay; DEALLOCATE replay;", "END;", "GO");
   }
   return L.join("\n") + "\n";
 }
-function pxCsv(pt, cols){
+// the replay needs every parameter of the query
+const pxReplayOK = pt=> pt.params.every((_,k)=>pxSelected("p:"+k));
+function pxCsv(rows, cols){
   const q = v=> /[";\r\n]/.test(v) || /^\s|\s$/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
   const lines = [cols.map(c=>q(c.name)).join(";")];
-  pt.rows.forEach((r,i)=> lines.push(cols.map(c=>{ const x = c.get(r,i); return x.k==="null" ? "" : q(x.v) }).join(";")));
+  rows.forEach((r,i)=> lines.push(cols.map(c=>{ const x = c.get(r,i); return x.k==="null" ? "" : q(x.v) }).join(";")));
   return String.fromCharCode(0xFEFF) + lines.join("\r\n") + "\r\n";
 }
 async function pxTable(){
@@ -1273,6 +1366,9 @@ function pxRender(){
   $("#pxDb").classList.toggle("hidden", v!=="db");
   $("#pxTable").closest("label").classList.toggle("hidden", v==="csv");
   $("#btnPxGo").textContent = t(v==="script"?"px.goScript":v==="csv"?"px.goCsv":"px.goDb");
+  const pt = PX.last && PX.last.family === PX.fam ? PX.last : null, ok = !pt || pxReplayOK(pt);
+  $("#pxReplay").disabled = !ok;
+  $("#pxReplayNote").classList.toggle("hidden", ok || v!=="script");
   const own = !!(connOK && lastConn);
   $("#pxConnForm").classList.toggle("hidden", own);
   $("#pxConnTxt").textContent = own ? t("px.connected", (lastSI&&lastSI.server) || lastConn.server || "") : t("px.connect");
@@ -1288,9 +1384,24 @@ async function openPx(){
   $("#pxDbTab").classList.toggle("hidden", !TOKEN);
   const s = curDetail.summary, np = (curDetail.params||[]).filter(p=>!p.pseudo).length;
   $("#pxInfo").textContent = t("px.info", fN(s.agg.count), np) + (np ? "" : " " + t("px.noParams"));
+  PX.sel = null; PX.last = null;
   $("#pxOv").classList.remove("hidden");
   pxRender();
+  pxLoadCols();
 }
+// reads the values of the query and lists the columns that can be exported
+async function pxLoadCols(){
+  const box = $("#pxCols"), fam = PX.fam;
+  box.innerHTML = `<p class="hint">${esc(t("px.reading"))}</p>`;
+  try{
+    const pt = await pxTable();
+    if(fam !== PX.fam) return;
+    if(!PX.sel) pxDefaultSel(pt);
+    pxRenderCols(pt);
+  }catch(e){ box.innerHTML = `<p class="err">${esc(e.message)}</p>` }
+}
+$("#pxMode").addEventListener("change", pxLoadCols);
+$("#pxCols").addEventListener("change", e=>{ const k = e.target.dataset.px; if(k){ (PX.sel = PX.sel || {})[k] = e.target.checked; pxRender() } });
 seg("#segPx", pxRender);
 $("#tFamily").addEventListener("click", e=>{ if(e.target.closest("#btnPx")) openPx() });
 $("#btnClosePx").onclick = ()=> $("#pxOv").classList.add("hidden");
@@ -1308,18 +1419,18 @@ $("#btnPxGo").onclick = async ()=>{
   const v = segVal("#segPx"), msg = $("#pxMsg"), btn = $("#btnPxGo");
   msg.className = "hint"; msg.textContent = t("px.reading"); btn.disabled = true;
   try{
-    const pt = await pxTable(), cols = pxColumns(pt);
-    const notes = (pt.lists ? " " + t("px.lists", pt.lists) : "") + (pt.failed ? " " + t("px.failed", fN(pt.failed)) : "");
+    const pt = await pxTable(), rows = pxRows(pt), cols = pxColumns(pt, rows);
+    const notes = pt.failed ? " " + t("px.failed", fN(pt.failed)) : "";
     const base = `paramlens-params-${pt.family+1}-${pt.mode}`;
-    if(v === "script"){ download(base+".sql", String.fromCharCode(0xFEFF)+pxScript(pt, cols), "application/sql"); msg.textContent = t("px.done", fN(pt.rows.length)) + notes }
-    else if(v === "csv"){ download(base+".csv", pxCsv(pt, cols), "text/csv"); msg.textContent = t("px.done", fN(pt.rows.length)) + notes }
+    if(v === "script"){ download(base+".sql", String.fromCharCode(0xFEFF)+pxScript(pt, rows, cols), "application/sql"); msg.textContent = t("px.done", fN(rows.length)) + notes }
+    else if(v === "csv"){ download(base+".csv", pxCsv(rows, cols), "text/csv"); msg.textContent = t("px.done", fN(rows.length)) + notes }
     else {
       if(!PX.conn || !$("#pxDbSel").value) throw new Error(t("px.connect"));
       const [sc, tb] = pxSplitTable($("#pxTable").value);
-      msg.textContent = t("px.inserting", fN(pt.rows.length));
+      msg.textContent = t("px.inserting", fN(rows.length));
       const r = await api("/api/insert", {conn:PX.conn, db:$("#pxDbSel").value, schema:sc, table:tb, replace:$("#pxDrop").checked,
         columns: cols.map(c=>({name:c.name, type:c.type})),
-        rows: pt.rows.map((row,i)=> cols.map(c=>{ const x = c.get(row,i); return x.k==="null" ? null : x.k==="bin" ? {b:x.v.slice(2)} : x.v }))}, true);
+        rows: rows.map((row,i)=> cols.map(c=>{ const x = c.get(row,i); return x.k==="null" ? null : x.k==="bin" ? {b:x.v.slice(2)} : x.v }))}, true);
       msg.className = "ok"; msg.textContent = t("px.inserted", fN(r.rows), `${$("#pxDbSel").value}.${sc}.${tb}`) + notes;
     }
   }catch(e){ msg.className = "err"; msg.textContent = e.message }

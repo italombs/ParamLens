@@ -23,7 +23,7 @@ async function analyzeFile(page, tsv) {
 
 async function checkResults(page, label, { samples }) {
   const fams = await page.$$eval("#famList .fam", els => els.length);
-  check(fams === 16, `${label}: 16 queries in the list (${fams})`);
+  check(fams === 18, `${label}: 18 queries in the list (${fams})`);
   const kpi = await page.textContent("#totKpis");
   check(/Executions/.test(kpi) && /Findings/.test(kpi), `${label}: KPIs in English`);
   const nFind = await page.$$eval("#tFindings .find", els => els.length);
@@ -82,6 +82,26 @@ async function checkParamExport(page, label, { db }) {
   const k = await download(page, "#btnPxGo");
   check(/\[combo_no\] int NOT NULL,\n  \[executions\] int NULL,/.test(k.text) && /avg_/.test(k.text), `${label}: script per combination`);
   await page.selectOption("#pxMode", "execs");
+  await page.click("#btnClosePx");
+}
+
+// hard-coded values of the selected query (the sample order query has two IN lists)
+async function checkHardCoded(page, label) {
+  await page.click("#famList .fam");
+  await page.waitForSelector("#tFamily:not(.hidden) #btnPx");
+  await page.click("#btnPx");
+  await page.waitForSelector("#pxCols input[data-px]");
+  const lits = await page.$$eval('#pxCols input[data-px^="l:"]', es => es.map(e => ({ on: e.checked, text: e.closest("label").textContent })));
+  const list = lits.find(l => /IN list/.test(l.text));
+  check(!!list && list.on && /nvarchar\(max\)/.test(list.text), `${label}: IN list offered as nvarchar(max) and suggested (${lits.length} hard-coded value(s))`);
+  await page.click("#segPx button[data-v=script]");
+  const s = await download(page, "#btnPxGo");
+  check(/\[\w+_list\] nvarchar\(max\) NULL/.test(s.text) && /N'\d+(,\d+)+'/.test(s.text), `${label}: list values exported separated by commas`);
+  check(/IN \(SELECT value FROM STRING_SPLIT\(@\w+_list, N'',''\)\)/.test(s.text) && /@\w+_list nvarchar\(max\)/.test(s.text), `${label}: replay passes the list through STRING_SPLIT`);
+  await page.click('#pxCols input[data-px="p:0"]');
+  check(await page.isDisabled("#pxReplay") && await page.isVisible("#pxReplayNote"), `${label}: the replay needs every parameter`);
+  await page.click('#pxCols input[data-px="p:0"]');
+  check(!(await page.isDisabled("#pxReplay")), `${label}: replay enabled again`);
   await page.click("#btnClosePx");
 }
 
@@ -175,6 +195,7 @@ async function noHorizontalScroll(page, label) {
   await checkResults(page, "html", { samples: true });
   await noHorizontalScroll(page, "html");
   await checkParamExport(page, "html", { db: false });
+  await checkHardCoded(page, "html");
   await checkCompare(page, "html");
   await checkCompareOther(page, "html", () => analyzeFile(page, tsvPath));
   await page.click("#mainTabs button[data-v=fails]");
@@ -189,7 +210,7 @@ async function noHorizontalScroll(page, label) {
   if (fs.existsSync(csvPath)) {
     await page.click("#btnNew");
     await analyzeFile(page, csvPath);
-    check((await page.$$("#famList .fam")).length === 16, "csv: 16 queries");
+    check((await page.$$("#famList .fam")).length === 18, "csv: 18 queries");
     await page.click("#mainTabs button[data-v=fails]");
     const fcsv = await page.textContent("#tFails");
     check(/Format\s*CSV · 14 columns/.test(fcsv) && /Ignored: event sp_statement_completed\s*63/.test(fcsv), "csv: format and ignored events");
@@ -272,6 +293,7 @@ async function noHorizontalScroll(page, label) {
     check(true, "exe: sample through the API");
     await p3.click("#btnCloseSample");
     await checkParamExport(p3, "exe", { db: true });
+    await checkHardCoded(p3, "exe");
     await checkCompare(p3, "exe");
     await checkCompareOther(p3, "exe", () => p3.click("#btnDemo"));
     await p3.selectOption("#langSel", "pt-BR");
@@ -289,7 +311,7 @@ async function noHorizontalScroll(page, label) {
     await p3.click("#btnToFile");
     check(await p3.isVisible("#vFile") && await p3.isVisible("#fBackSrv"), "exe: switch to file mode");
     await analyzeFile(p3, tsvPath);
-    check((await p3.$$("#famList .fam")).length === 16, "exe: file analyzed in the browser");
+    check((await p3.$$("#famList .fam")).length === 18, "exe: file analyzed in the browser");
     const [dl3] = await Promise.all([p3.waitForEvent("download"), p3.click("#btnExport")]);
     check(/^paramlens-/.test(dl3.suggestedFilename()), "exe: local export in file mode");
     await p3.click("#btnNew");

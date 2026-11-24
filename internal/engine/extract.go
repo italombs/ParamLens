@@ -19,23 +19,36 @@ type ParamColumn struct {
 // Values are canonical literals ('text', 12, 0x0A, NULL, DEFAULT) or "(absent)"/"(no value)".
 type ParamRow struct {
 	Values []string `json:"values"`
+	Lits   []string `json:"lits"` // hard-coded values, in the order of ParamTable.Literals
 	Count  int      `json:"count"`
 	Sum    Metrics  `json:"sum"`
 	Exec   int32    `json:"exec"` // first execution with these values
 }
 
 type ParamTable struct {
-	Family int            `json:"family"`
-	Kind   string         `json:"kind"`
-	Proc   string         `json:"proc"`
-	SQL    string         `json:"sql"`
-	Decl   string         `json:"decl"` // most used parameter declaration
-	Mode   string         `json:"mode"`
-	Has    [NMetrics]bool `json:"has"`
-	Lists  int            `json:"lists"` // inline IN lists (not exported)
-	Params []ParamColumn  `json:"params"`
-	Rows   []ParamRow     `json:"rows"`
-	Failed int            `json:"failed"` // statements that could not be read back
+	Family   int            `json:"family"`
+	Kind     string         `json:"kind"`
+	Proc     string         `json:"proc"`
+	SQL      string         `json:"sql"`
+	Decl     string         `json:"decl"` // most used parameter declaration
+	Mode     string         `json:"mode"`
+	Has      [NMetrics]bool `json:"has"`
+	Lists    int            `json:"lists"` // inline IN lists
+	Params   []ParamColumn  `json:"params"`
+	Literals []LitColumn    `json:"literals"` // hard-coded values of the SQL text
+	SQLParts []string       `json:"sqlParts"` // the SQL around the literals: parts[0] lit[0] parts[1] ... (empty without literals)
+	Rows     []ParamRow     `json:"rows"`
+	Failed   int            `json:"failed"` // statements that could not be read back
+}
+
+// LitColumn is a hard-coded value of the SQL text (see ExtractLiterals), exported like a parameter.
+type LitColumn struct {
+	Name  string `json:"name"` // "[EN].[STATE] <>", "IN [EN].[TYPE]"
+	Var   string `json:"var"`  // parameter name for it: @STATE, @TYPE_list
+	List  bool   `json:"list"`
+	Type  string `json:"type"`  // base type over all executions (lists: nvarchar)
+	Comma bool   `json:"comma"` // list: an item has a comma inside, in some execution
+	Text  string `json:"text"`  // as written in the SQL text of the first execution
 }
 
 var errNoFamily = errors.New("query not found")
@@ -52,7 +65,7 @@ func (e *Engine) ParamTable(id int, mode string) (*ParamTable, error) {
 	if mode != "combos" {
 		mode = "execs"
 	}
-	pt := &ParamTable{Family: f.ID, Kind: f.Kind, Proc: f.Proc, SQL: f.SampleSQL, Mode: mode, Has: e.has, Params: []ParamColumn{}, Rows: []ParamRow{}}
+	pt := &ParamTable{Family: f.ID, Kind: f.Kind, Proc: f.Proc, SQL: f.SampleSQL, Mode: mode, Has: e.has, Params: []ParamColumn{}, Literals: []LitColumn{}, SQLParts: []string{}, Rows: []ParamRow{}}
 	var best KV
 	found := false
 	for k, v := range f.Decls {
@@ -80,6 +93,26 @@ func (e *Engine) ParamTable(id int, mode string) (*ParamTable, error) {
 		colOf[i] = len(cols)
 		cols = append(cols, i)
 	}
+	if f.Kind != "proc" {
+		if lits := ExtractLiterals(f.SampleSQL); len(lits) > 0 {
+			used := map[string]bool{}
+			for _, p := range f.Params {
+				used[strings.ToLower(p.Name)] = true
+			}
+			for _, t := range Tokenize(f.SampleSQL) {
+				if t.Kind == TkVar {
+					used[strings.ToLower(t.Text)] = true
+				}
+			}
+			prev := 0
+			for _, l := range lits {
+				pt.SQLParts = append(pt.SQLParts, f.SampleSQL[prev:l.start])
+				pt.Literals = append(pt.Literals, LitColumn{Name: l.Name, Var: literalVar(l.Label, l.List, used), List: l.List, Type: l.Type, Comma: l.Comma, Text: f.SampleSQL[l.start:l.end]})
+				prev = l.end
+			}
+			pt.SQLParts = append(pt.SQLParts, f.SampleSQL[prev:])
+		}
+	}
 	byKey := map[string]int{}
 	var buf []byte
 	for _, ix := range f.Execs {
@@ -87,6 +120,10 @@ func (e *Engine) ParamTable(id int, mode string) (*ParamTable, error) {
 		vals := make([]string, len(cols))
 		for k := range vals {
 			vals[k] = absentValue
+		}
+		lits := make([]string, len(pt.Literals))
+		for k := range lits {
+			lits[k] = absentValue
 		}
 		if cap(buf) < int(ex.Len) {
 			buf = make([]byte, ex.Len)
@@ -105,12 +142,21 @@ func (e *Engine) ParamTable(id int, mode string) (*ParamTable, error) {
 					vals[colOf[pi]] = p.Value
 				}
 			}
+			if len(lits) > 0 {
+				if el := ExtractLiterals(rpc.SQL); len(el) == len(lits) {
+					for k, l := range el {
+						lits[k] = l.Value
+						pt.Literals[k].Type = widenType(pt.Literals[k].Type, l.Type)
+						pt.Literals[k].Comma = pt.Literals[k].Comma || l.Comma
+					}
+				}
+			}
 		}
 		if mode == "execs" {
-			pt.Rows = append(pt.Rows, ParamRow{Values: vals, Count: 1, Sum: ex.M, Exec: ix})
+			pt.Rows = append(pt.Rows, ParamRow{Values: vals, Lits: lits, Count: 1, Sum: ex.M, Exec: ix})
 			continue
 		}
-		key := strings.Join(vals, "\x00")
+		key := strings.Join(vals, "\x00") + "\x01" + strings.Join(lits, "\x00")
 		if r, ok := byKey[key]; ok {
 			row := &pt.Rows[r]
 			row.Count++
@@ -120,7 +166,7 @@ func (e *Engine) ParamTable(id int, mode string) (*ParamTable, error) {
 			continue
 		}
 		byKey[key] = len(pt.Rows)
-		pt.Rows = append(pt.Rows, ParamRow{Values: vals, Count: 1, Sum: ex.M, Exec: ix})
+		pt.Rows = append(pt.Rows, ParamRow{Values: vals, Lits: lits, Count: 1, Sum: ex.M, Exec: ix})
 	}
 	if mode == "combos" {
 		sort.SliceStable(pt.Rows, func(a, b int) bool {

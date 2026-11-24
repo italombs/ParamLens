@@ -91,7 +91,37 @@ the application sent different sizes); duration and CPU are in microseconds.
   transaction, on the connection of the start screen or on another server you connect to in the dialog.
   *Drop the table if it already exists* replaces it; otherwise the rows are appended.
 
-Inline `IN (…)` lists are part of the SQL text, not parameters, so they are not exported.
+### Hard-coded values
+
+The dialog also lists the **hard-coded values** of the SQL text, so they can be exported like
+parameters:
+
+- **Inline `IN (…)` lists:** a `nvarchar(max)` column with the values separated by commas (`1,2,3`;
+  text without quotes), ready for `STRING_SPLIT`. A warning shows when an item has a comma inside, since
+  `STRING_SPLIT` would split it.
+- **Literals compared with a column:** `col = 6`, `col <> N'x'`, `col LIKE 'a%'`,
+  `col BETWEEN 1 AND 9`. The column gets the type of the literal (`int`, `bigint`, `decimal(p,s)`,
+  `nvarchar(n)`…).
+
+Literals compared with a variable (the `@p = 0` of a catch-all) and literals in other places (`TOP 50`,
+`count(1)`, `varchar(10)`) are not listed.
+
+**Suggested columns:** every parameter, plus the hard-coded values that change between calls; values
+that are always the same start unchecked. In *distinct combination* mode the combinations are grouped
+again by the columns you keep.
+
+With hard-coded values selected, the **replay loop runs the query with them as parameters**, which is
+how you would call it from the application:
+
+```sql
+-- application text:  ... WHERE state_id <> 6 AND type_id IN (1, 2) AND store_id = @store
+-- replayed text:     ... WHERE state_id <> @state_id
+--                        AND type_id IN (SELECT value FROM STRING_SPLIT(@type_id_list, N','))
+--                        AND store_id = @store
+```
+
+`STRING_SPLIT` needs database compatibility level 130 (SQL Server 2016) or later. The replay needs
+every parameter of the query, so it is turned off while one of them is unchecked.
 
 ## 5. Compare a query before and after a rewrite
 

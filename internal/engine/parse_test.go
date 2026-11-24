@@ -116,7 +116,8 @@ func TestParamTableFullValues(t *testing.T) {
 		t.Errorf("decl %q types %+v", pt.Decl, pt.Params[1].Types)
 	}
 	pc, _ := e.ParamTable(0, "combos")
-	if len(pc.Rows) != 2 || pc.Rows[0].Count != 2 || pc.Rows[0].Sum[MDur] != 300 {
+	// the IN list is a hard-coded value: (7, long, "1,2") and (7, long, "3") are two combinations
+	if len(pc.Rows) != 3 || pc.Rows[0].Count != 1 || pc.Rows[0].Sum[MDur] != 100 || pc.Rows[1].Lits[0] != "3" {
 		t.Errorf("combos %+v", pc.Rows)
 	}
 	d := e.Distributions()
